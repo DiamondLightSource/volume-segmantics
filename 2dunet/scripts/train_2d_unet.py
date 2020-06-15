@@ -112,7 +112,7 @@ def bce_loss(logits, labels):
     return F.binary_cross_entropy_with_logits(logits, labels)
 
 
-def find_appropriate_lr(model:Learner, lr_diff:int = 15, loss_threshold:float = .05, adjust_value:float = 1, plot:bool = False) -> float:
+def find_appropriate_lr(model:Learner, lr_diff:int = 15, loss_threshold:float = .05, adjust_value:float = 1) -> float:
     """Function taken from https://forums.fast.ai/t/automated-learning-rate-suggester/44199
         Parameters:
 
@@ -142,21 +142,6 @@ def find_appropriate_lr(model:Learner, lr_diff:int = 15, loss_threshold:float = 
         l_idx -= 1
 
     lr_to_use = local_min_lr * adjust_value
-    
-    if plot:
-        # plots the gradients of the losses in respect to the learning rate change
-        plt.plot(loss_grad)
-        plt.plot(len(losses)+l_idx, loss_grad[l_idx],markersize=10,marker='o',color='red')
-        plt.ylabel("Loss")
-        plt.xlabel("Index of LRs")
-        plt.show()
-
-        plt.plot(np.log10(lrs), losses)
-        plt.ylabel("Loss")
-        plt.xlabel("Log 10 Transform of Learning Rate")
-        loss_coord = np.interp(np.log10(lr_to_use), np.log10(lrs), losses)
-        plt.plot(np.log10(lr_to_use), loss_coord, markersize=10,marker='o',color='red')
-        plt.show()
         
     return lr_to_use
 
@@ -210,3 +195,41 @@ if NUM_CYC_UNFROZEN > 0:
 model_out = OUT_ROOT_DIR/MODEL_OUTPUT_FN
 print(f"Exporting trained model to {model_out}")
 learn.export(model_out)
+
+# Output a figure showing predictions from the validation dataset
+filename_list = data.valid_ds.items[:3]
+img_list = []
+pred_list = []
+gt_list = []
+for fn in filename_list:
+    img_list.append(open_image(fn))
+    gt_list.append(io.imread(get_y_fn(fn)))
+for img in img_list:
+    pred_list.append(img_as_ubyte(learn.predict(img)[1][0]))
+# Horrible conversion from Fastai image to unit8 data array
+img_list = [img_as_ubyte(exposure.rescale_intensity(x.data.numpy()[0, :, :], out_range='float')) for x in img_list]
+
+# Create the plot
+fig=plt.figure(figsize=(12, 12))
+columns = 3
+rows = 3
+j= 0
+for i in range(columns*rows)[::3]:
+    img = img_list[j]
+    gt = gt_list[j]
+    pred = pred_list[j]
+    col1 = fig.add_subplot(rows, columns, i + 1)
+    plt.imshow(img, cmap='gray')
+    col2 = fig.add_subplot(rows, columns, i + 2)
+    plt.imshow(gt, cmap='gray')
+    col3 = fig.add_subplot(rows, columns, i + 3)
+    plt.imshow(pred, cmap='gray')
+    j += 1
+    if i == 0:
+        col1.title.set_text('Data')
+        col2.title.set_text('Ground Truth')
+        col3.title.set_text('Prediction')
+plt.suptitle(f"Predictions for {MODEL_OUTPUT_FN}", fontsize=16)
+plt_out_pth = OUT_ROOT_DIR/f'{model_out.stem}_prediction_image.png' 
+print(f"Saving example image predictions to {plt_out_pth}")  
+plt.savefig(plt_out_pth, dpi=300)
