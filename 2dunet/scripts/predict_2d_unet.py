@@ -99,7 +99,6 @@ def predict_orthog_slices_to_disk(learn, axis, data_arr, output_path):
         for val in tqdm(range(data_shape[1]), desc='Predicting x stack', bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}'):
             predict_single_slice(learn, 'x', val, data_arr[:, val, :], output_path, NORMALISE)                    
     if axis in ['y', 'all']:
-        print('Predicting y stack\n')
         for val in tqdm(range(data_shape[2]), desc='Predicting y stack', bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}'):
             predict_single_slice(learn, 'y', val, data_arr[:, :, val], output_path, NORMALISE)
     if axis not in ['x', 'y', 'z', 'all']:
@@ -163,6 +162,10 @@ def combine_slices_to_vol(folder_path):
         print(f'Outputting volume to {output_path}')
         with h5.File(output_path, 'w') as f:
             f['/data'] = data_vol
+        # Delete the images
+        print(f"Deleting {len(axis_files)} image files for axis {axis}")
+        for filename in axis_files:
+            os.remove(filename)
     return output_path_list
 
 def combine_vols(output_path_list, k, prefix, final=False):

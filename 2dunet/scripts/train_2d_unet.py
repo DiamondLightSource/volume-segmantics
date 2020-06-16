@@ -1,6 +1,7 @@
 import os
 import warnings
 import yaml
+import glob
 from tqdm import tqdm
 
 import dask.array as da
@@ -163,7 +164,7 @@ print(f"using bs={bs}, have {free}MB of GPU RAM free")
 
 # Create the training and test set
 print("Creating training dataset from saved images.")
-np.random.seed(42)
+# np.random.seed(42)
 src = (BinaryItemList.from_folder(DATA_IM_OUT_DIR)
        .split_by_rand_pct()
        .label_from_func(get_y_fn, classes=CODES))
@@ -233,3 +234,13 @@ plt.suptitle(f"Predictions for {MODEL_OUTPUT_FN}", fontsize=16)
 plt_out_pth = OUT_ROOT_DIR/f'{model_out.stem}_prediction_image.png' 
 print(f"Saving example image predictions to {plt_out_pth}")  
 plt.savefig(plt_out_pth, dpi=300)
+
+data_ims = glob.glob(f"{str(DATA_IM_OUT_DIR) + '/*.png'}")
+print(f"Deleting {len(data_ims)} image slices")
+for fn in data_ims:
+    os.remove(fn)
+
+seg_ims = glob.glob(f"{str(SEG_IM_OUT_DIR) + '/*.png'}")
+print(f"Deleting {len(seg_ims)} ground truth slices")
+for fn in seg_ims:
+    os.remove(fn)
