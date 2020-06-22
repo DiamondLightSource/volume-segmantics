@@ -198,6 +198,7 @@ print(f"Exporting trained model to {model_out}")
 learn.export(model_out)
 
 # Output a figure showing predictions from the validation dataset
+learn.data.single_ds.tfmargs['size'] = None # Remove the restriction on the model prediction size
 filename_list = data.valid_ds.items[:3]
 img_list = []
 pred_list = []
