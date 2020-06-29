@@ -29,14 +29,16 @@ STARTING_LR = 1e-6
 END_LR = 0.1
 LR_FIND_EPOCHS = 2
 DATA_DIR = Path('/dls/i12/data/2019/nt23252-1/processing/olly/200608_3d_unet_development')
-TRAIN_DATA = 'data_vol_train_384_image.h5'
-TRAIN_SEG =  'seg_vol_train_384_image.h5'
+TRAIN_DATA = 'data_vol_train_384_image.h5' 
+TRAIN_SEG =  'seg_vol_train_384_image.h5' # Need to ensure values are [0,1]
 VALID_DATA = 'data_vol_valid_256_image_uint8.h5'
-VALID_SEG = 'seg_vol_valid_256_image.h5'
+VALID_SEG = 'seg_vol_valid_256_image.h5' # Need to ensure values are [0,1]
 PATCH_SIZE = (128, 128, 128)
 SAMPLE_PER_VOL = 48
 MAX_QUEUE_LENGTH = 48
 NUM_WORKERS = 8
+MODEL_OUT_FN = '200626_3dUnet_vol3_blood_tiss_ADAMW_50_best.pytorch'
+NUM_EPOCHS = 50
 
 device = 0  # Once single GPU slected, default device will always be 0
 ds_data = 'data'  # Keys for accesi
@@ -127,7 +129,7 @@ else:
     training_batch_size = 4 # Set to 4 for 32Gb Card
     validation_batch_size = 4
 print(f"Patch size is {PATCH_SIZE}")
-print(f"Free GPU memory is {free_gpu_mem:.4f} GB. Batch size will be {training_batch_size}.")
+print(f"Free GPU memory is {free_gpu_mem:0.4f} GB. Batch size will be {training_batch_size}.")
 
 sampler = torchio.data.UniformSampler(PATCH_SIZE)
 
@@ -182,7 +184,7 @@ iters = 0
 smoothing = 0.05
 print(f"Training for {LR_FIND_EPOCHS} epochs to create a learning rate plot.")
 for i in range(LR_FIND_EPOCHS):   
-    for batch_idx, batch in enumerate(tqdm(training_loader, desc=f'Epoch {i}, batch number',
+    for batch_idx, batch in enumerate(tqdm(training_loader, desc=f'Epoch {i + 1}, batch number',
                                                 bar_format='{l_bar}{bar:30}{r_bar}{bar:-30b}')):
         inputs, targets = prepare_batch(batch, device)
         optimizer.zero_grad()
@@ -203,7 +205,7 @@ for i in range(LR_FIND_EPOCHS):
 
 
 fig = tpl.figure()
-fig.plot(lr_find_lr, lr_find_loss, width=50, height=30)
+fig.plot(lr_find_lr, lr_find_loss, width=50, height=30, xlabel='Learning Rate')
 fig.show()
 
 # TODO Wrap this in a funnction 
@@ -228,3 +230,58 @@ while (l_idx >= -len(losses)) and (abs(loss_grad[r_idx] - loss_grad[l_idx]) > lo
 
 lr_to_use = local_min_lr * 0.75
 print(f"LR to use {lr_to_use}")
+
+############## Model Training ###################
+ # recreate the Unet and the optimizer
+print("Recreating the U-net and optimizer")
+unet = create_unet_on_device(device, model_dict)
+optimizer = torch.optim.AdamW(unet.parameters(), lr=STARTING_LR)
+
+
+# Now train with 1 cycle policy with max LR set between to lr_to_use
+# TODO - Put this into a function
+best_eval = 0
+model_out_path = DATA_DIR/MODEL_OUT_FN
+train_loss_lst = []
+lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=lr_to_use, steps_per_epoch=len(training_loader), epochs=NUM_EPOCHS, pct_start=0.5)
+for i in range(NUM_EPOCHS):
+    unet.train()
+    tic = time.perf_counter()
+    print("epoch {} of {}".format(i + 1, NUM_EPOCHS))
+    for batch_idx, batch in enumerate(tqdm(training_loader, desc='Training batch',
+                                                    bar_format='{l_bar}{bar:30}{r_bar}{bar:-30b}')):
+        inputs, targets = prepare_batch(batch, device)
+        output = unet(inputs)
+        loss = loss_criterion(output, targets)
+        train_loss_lst.append(loss.item())
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        lr_scheduler.step()
+    # Validate
+    val_loss_lst = []
+    val_eval_lst = []
+    unet.eval()
+    with torch.no_grad():
+        for batch_idx, batch in enumerate(tqdm(validation_loader, desc='Validation batch',
+                                                    bar_format='{l_bar}{bar:30}{r_bar}{bar:-30b}')):
+            inputs, targets = prepare_batch(batch, device)
+            output = unet(inputs)
+            val_loss = loss_criterion(output, targets)
+            val_loss_lst.append(val_loss.item())
+            # if model contains final_activation layer for normalizing logits apply it, otherwise
+            # the evaluation metric will be incorrectly computed
+            if hasattr(unet, 'final_activation') and unet.final_activation is not None:
+                output = unet.final_activation(output)
+            eval_score = eval_criterion(output, targets)
+            val_eval_lst.append(eval_score.item())
+            eval_avg = np.average(val_eval_lst)
+        print(f'Epoch {i + 1}. Training loss: {np.average(train_loss_lst)}, Validation Loss: {np.average(val_loss_lst)}. MeanIOU: {eval_avg}')
+        if eval_avg > best_eval:
+            best_eval = eval_avg
+            state_dict = unet.state_dict()
+            print(f'Saving best model with MeanIOU of {eval_avg} to {model_out_path}')
+            torch.save(state_dict, model_out_path)
+            
+    toc = time.perf_counter()
+    print(f"Time taken for epoch {i + 1}: {toc - tic:0.4f} seconds")
