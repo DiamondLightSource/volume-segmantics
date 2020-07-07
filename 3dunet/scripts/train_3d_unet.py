@@ -4,41 +4,61 @@
 import enum
 import math
 import os
+import sys
 import time
+from datetime import date
 from pathlib import Path
+import yaml
 
 import h5py as h5
 import numpy as np
+import termplotlib as tpl
 import torch
 import torchio
+from matplotlib import pyplot as plt
+from pytorch3dunet.unet3d.metrics import MeanIoU
+from pytorch3dunet.unet3d.model import ResidualUNet3D
 from torch import nn as nn
 from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.data import DataLoader
 from torchio import DATA
+from torchio.data.inference import GridSampler
 from torchio.transforms import (Compose, OneOf, RandomAffine, RandomBlur,
                                 RandomElasticDeformation, RandomFlip,
                                 RandomNoise, RescaleIntensity)
 from tqdm import tqdm
 
-import termplotlib as tpl
-from pytorch3dunet.unet3d.metrics import MeanIoU
-from pytorch3dunet.unet3d.model import ResidualUNet3D
 
-CUDA_DEVICE = '2' # Select a particular GPU
+# real_path = os.path.realpath(__file__)
+# dir_path = os.path.dirname(real_path)  # Extract the directory of the script
+# settings_path = Path(dir_path, 'settings', '3d_unet_train_settings.yaml')
+# print(f"Loading settings from {settings_path}")
+# if settings_path.exists():
+#     with open(settings_path, 'r') as stream:
+#         settings_dict = yaml.safe_load(stream)
+# else:
+#     print("Couldn't find settings file... Exiting!")
+#     sys.exit(1)
+
+CUDA_DEVICE = '0'  # Select a particular GPU
 STARTING_LR = 1e-6
 END_LR = 0.1
 LR_FIND_EPOCHS = 2
-DATA_DIR = Path('/dls/i12/data/2019/nt23252-1/processing/olly/200608_3d_unet_development')
-TRAIN_DATA = 'data_vol_train_384_image.h5' 
-TRAIN_SEG =  'seg_vol_train_384_image.h5' # Need to ensure values are [0,1]
+DATA_DIR = Path(
+    '/dls/i12/data/2019/nt23252-1/processing/olly/200608_3d_unet_development')
+TRAIN_DATA = 'data_vol_train_384_image.h5'
+TRAIN_SEG = 'seg_vol_train_384_image.h5'  # Need to ensure values are [0,1]
 VALID_DATA = 'data_vol_valid_256_image_uint8.h5'
-VALID_SEG = 'seg_vol_valid_256_image.h5' # Need to ensure values are [0,1]
+VALID_SEG = 'seg_vol_valid_256_image.h5'  # Need to ensure values are [0,1]
 PATCH_SIZE = (128, 128, 128)
-SAMPLE_PER_VOL = 48
+TRAIN_PATCHES = 48
+VALID_PATCHES = 24
 MAX_QUEUE_LENGTH = 48
 NUM_WORKERS = 8
 MODEL_OUT_FN = '200626_3dUnet_vol3_blood_tiss_ADAMW_50_best.pytorch'
-NUM_EPOCHS = 50
+NUM_EPOCHS = 100
+PATIENCE = 7
+THRESH_VAL = 0.5
 
 device = 0  # Once single GPU slected, default device will always be 0
 ds_data = 'data'  # Keys for accesi
@@ -46,34 +66,37 @@ ds_label = 'label'
 
 model_dict = {
     # model class, e.g. UNet3D, ResidualUNet3D
-  "name": "ResidualUNet3D",
-  # number of input channels to the model
-  "in_channels": 1,
-  # number of output channels
-  "out_channels": 1,
-  # determines the order of operators in a single layer (gcr - GroupNorm+Conv3d+ReLU)
-  "layer_order": "gcr",
-  # feature maps scale factor
-  "f_maps": 32,
-  # number of groups in the groupnorm
-  "num_groups": 8,
-  # apply element-wise nn.Sigmoid after the final 1x1 convolution, otherwise apply nn.Softmax
-  "final_sigmoid": True,
-  # if True applies the final normalization layer (sigmoid or softmax), otherwise the networks returns the output from the final convolution layer; use False for regression problems, e.g. de-noising
-  "is_segmentation": True
+    "name": "ResidualUNet3D",
+    # number of input channels to the model
+    "in_channels": 1,
+    # number of output channels
+    "out_channels": 1,
+    # determines the order of operators in a single layer (gcr - GroupNorm+Conv3d+ReLU)
+    "layer_order": "gcr",
+    # feature maps scale factor
+    "f_maps": 32,
+    # number of groups in the groupnorm
+    "num_groups": 8,
+    # apply element-wise nn.Sigmoid after the final 1x1 convolution, otherwise apply nn.Softmax
+    "final_sigmoid": True,
+    # if True applies the final normalization layer (sigmoid or softmax), otherwise the networks returns the output from the final convolution layer; use False for regression problems, e.g. de-noising
+    "is_segmentation": True
 }
 
 os.environ['CUDA_VISIBLE_DEVICES'] = CUDA_DEVICE
+
 
 def create_unet_on_device(device, model_dict):
     unet = ResidualUNet3D(**model_dict)
     print(f"Sending the model to device {CUDA_DEVICE}")
     return unet.to(device)
 
+
 def tensor_from_hdf5(file_path, data_path):
     with h5.File(file_path, 'r') as f:
         tens = torch.from_numpy(f[data_path][()])
     return tens
+
 
 unet = create_unet_on_device(device, model_dict)
 
@@ -84,7 +107,7 @@ eval_criterion = MeanIoU()
 # Create optimizer
 optimizer = torch.optim.AdamW(unet.parameters(), lr=STARTING_LR)
 
-#Load the data into tensors
+# Load the data into tensors
 train_data_tens = tensor_from_hdf5(DATA_DIR/TRAIN_DATA, '/data')
 train_seg_tens = tensor_from_hdf5(DATA_DIR/TRAIN_SEG, '/data')
 valid_data_tens = tensor_from_hdf5(DATA_DIR/VALID_DATA, '/data')
@@ -108,7 +131,7 @@ training_transform = Compose([
     OneOf({
         RandomAffine(): 0.8,
         RandomElasticDeformation(): 0.2,
-    }, p=0.5), # Changed from p=0.75 24/6/20
+    }, p=0.5),  # Changed from p=0.75 24/6/20
 ])
 
 training_dataset = torchio.ImagesDataset(
@@ -120,23 +143,24 @@ validation_dataset = torchio.ImagesDataset(
 
 total_gpu_mem = torch.cuda.get_device_properties(device).total_memory
 allocated_gpu_mem = torch.cuda.memory_allocated(device)
-free_gpu_mem = (total_gpu_mem - allocated_gpu_mem) / 1024**3  # free 
+free_gpu_mem = (total_gpu_mem - allocated_gpu_mem) / 1024**3  # free
 
-if free_gpu_mem < 20: 
-    training_batch_size = 2 # Set to 4 for 32Gb Card
+if free_gpu_mem < 20:
+    training_batch_size = 2  # Set to 4 for 32Gb Card
     validation_batch_size = 2
 else:
-    training_batch_size = 4 # Set to 4 for 32Gb Card
+    training_batch_size = 4  # Set to 4 for 32Gb Card
     validation_batch_size = 4
 print(f"Patch size is {PATCH_SIZE}")
-print(f"Free GPU memory is {free_gpu_mem:0.4f} GB. Batch size will be {training_batch_size}.")
+print(
+    f"Free GPU memory is {free_gpu_mem:0.4f} GB. Batch size will be {training_batch_size}.")
 
 sampler = torchio.data.UniformSampler(PATCH_SIZE)
 
 patches_training_set = torchio.Queue(
     subjects_dataset=training_dataset,
     max_length=MAX_QUEUE_LENGTH,
-    samples_per_volume=SAMPLE_PER_VOL,
+    samples_per_volume=TRAIN_PATCHES,
     sampler=sampler,
     num_workers=NUM_WORKERS,
     shuffle_subjects=False,
@@ -146,7 +170,7 @@ patches_training_set = torchio.Queue(
 patches_validation_set = torchio.Queue(
     subjects_dataset=validation_dataset,
     max_length=MAX_QUEUE_LENGTH,
-    samples_per_volume=SAMPLE_PER_VOL,
+    samples_per_volume=VALID_PATCHES,
     sampler=sampler,
     num_workers=NUM_WORKERS,
     shuffle_subjects=False,
@@ -160,7 +184,6 @@ validation_loader = torch.utils.data.DataLoader(
     patches_validation_set, batch_size=validation_batch_size)
 
 
-
 def prepare_batch(batch, device):
     inputs = batch[ds_data][DATA].to(device)
     targets = batch[ds_label][DATA].to(device)
@@ -168,120 +191,344 @@ def prepare_batch(batch, device):
 
 
 # Create learning rate adjustment strategy
-# To start with, we want to find the optimum learning rate wilearning_rate As decribed here 
+# To start with, we want to find the optimum learning rate wilearning_rate As decribed here
 # https://towardsdatascience.com/adaptive-and-cyclical-learning-rates-using-pytorch-2bf904d18dee
 
-lr_lambda = lambda x: math.exp(x * math.log(END_LR / STARTING_LR) / (LR_FIND_EPOCHS * len(training_loader)))
+def lr_lambda(x): 
+    return math.exp(
+    x * math.log(END_LR / STARTING_LR) / (LR_FIND_EPOCHS * len(training_loader))
+    )
+
+
 lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
 
 
 ################## Find a decent learning rate #####################
+def lr_finder(model, training_loader, optimizer, lr_scheduler, smoothing=0.05, plt_fig=True):
+    lr_find_loss = []
+    lr_find_lr = []
+    iters = 0
 
-unet.train()
-lr_find_loss = []
-lr_find_lr = []
-iters = 0
-smoothing = 0.05
-print(f"Training for {LR_FIND_EPOCHS} epochs to create a learning rate plot.")
-for i in range(LR_FIND_EPOCHS):   
-    for batch_idx, batch in enumerate(tqdm(training_loader, desc=f'Epoch {i + 1}, batch number',
-                                                bar_format='{l_bar}{bar:30}{r_bar}{bar:-30b}')):
-        inputs, targets = prepare_batch(batch, device)
-        optimizer.zero_grad()
-        output = unet(inputs)
-        loss = loss_criterion(output, targets)
-        loss.backward()
-        optimizer.step()
-        lr_scheduler.step()
-        lr_step = optimizer.state_dict()["param_groups"][0]["lr"]
-        lr_find_lr.append(lr_step)
-        if iters==0:
-            lr_find_loss.append(loss)
-        else:
-            loss = smoothing  * loss + (1 - smoothing) * lr_find_loss[-1]
-            lr_find_loss.append(loss)
-     
-        iters += 1
+    model.train()
+    print(f"Training for {LR_FIND_EPOCHS} epochs to create a learning rate plot.")
+    for i in range(LR_FIND_EPOCHS):
+        for batch in tqdm(training_loader, desc=f'Epoch {i + 1}, batch number',
+                          bar_format='{l_bar}{bar:30}{r_bar}{bar:-30b}'):
+            inputs, targets = prepare_batch(batch, device)
+            optimizer.zero_grad()
+            output = model(inputs)
+            loss = loss_criterion(output, targets)
+            loss.backward()
+            optimizer.step()
+            lr_scheduler.step()
+            lr_step = optimizer.state_dict()["param_groups"][0]["lr"]
+            lr_find_lr.append(lr_step)
+            if iters == 0:
+                lr_find_loss.append(loss)
+            else:
+                loss = smoothing * loss + (1 - smoothing) * lr_find_loss[-1]
+                lr_find_loss.append(loss)
 
+            iters += 1
 
-fig = tpl.figure()
-fig.plot(lr_find_lr, lr_find_loss, width=50, height=30, xlabel='Learning Rate')
-fig.show()
+    if plt_fig:
+        fig = tpl.figure()
+        fig.plot(lr_find_lr, lr_find_loss, width=50, height=30, xlabel='Learning Rate')
+        fig.show()
 
-# TODO Wrap this in a funnction 
+    return lr_find_loss, lr_find_lr
 
-lr_diff = 15
-loss_threshold = .05
-losses = np.array(lr_find_loss)
-assert(lr_diff < len(losses))
-loss_grad = np.gradient(losses)
-lrs = lr_find_lr
-    
-#Search for index in gradients where loss is lowest before the loss spike
-#Initialize right and left idx using the lr_diff as a spacing unit
-#Set the local min lr as -1 to signify if threshold is too low
-local_min_lr = 0.001 # Add as default value to fix bug
-r_idx = -1
-l_idx = r_idx - lr_diff
-while (l_idx >= -len(losses)) and (abs(loss_grad[r_idx] - loss_grad[l_idx]) > loss_threshold):
-    local_min_lr = lrs[l_idx]
-    r_idx -= 1
-    l_idx -= 1
+def find_appropriate_lr(model, lr_find_loss, lr_find_lr, lr_diff=15, loss_threshold=.05, adjust_value=0.75):
+    """Function taken from https://forums.fast.ai/t/automated-learning-rate-suggester/44199
+        Parameters:
 
-lr_to_use = local_min_lr * 0.75
-print(f"LR to use {lr_to_use}")
+        lr_diff provides the interval distance by units of the “index of LR” (log transform of LRs) between the right and left bound
+        loss_threshold is the maximum difference between the left and right bound’s loss values to stop the shift
+        adjust_value is a coefficient to the final learning rate for pure manual adjustment
+    """
+    #Get loss values and their corresponding gradients, and get lr values
+    losses = np.array(lr_find_loss)
+    assert(lr_diff < len(losses))
+    loss_grad = np.gradient(losses)
+    lrs = lr_find_lr
+
+    #Search for index in gradients where loss is lowest before the loss spike
+    #Initialize right and left idx using the lr_diff as a spacing unit
+    #Set the local min lr as -1 to signify if threshold is too low
+    local_min_lr = 0.001  # Add as default value to fix bug
+    r_idx = -1
+    l_idx = r_idx - lr_diff
+    while (l_idx >= -len(losses)) and (abs(loss_grad[r_idx] - loss_grad[l_idx]) > loss_threshold):
+        local_min_lr = lrs[l_idx]
+        r_idx -= 1
+        l_idx -= 1
+
+    lr_to_use = local_min_lr * adjust_value
+
+    return lr_to_use
 
 ############## Model Training ###################
- # recreate the Unet and the optimizer
+
+
+class EarlyStopping:
+    """Early stops the training if validation loss doesn't improve after a given patience.
+    This class taken from https://github.com/Bjarten/early-stopping-pytorch/blob/master/pytorchtools.py"""
+
+    def __init__(self, patience=7, verbose=False, delta=0, path='checkpoint.pt'):
+        """
+        Args:
+            patience (int): How long to wait after last time validation loss improved.
+                            Default: 7
+            verbose (bool): If True, prints a message for each validation loss improvement. 
+                            Default: False
+            delta (float): Minimum change in the monitored quantity to qualify as an improvement.
+                            Default: 0
+            path (str): Path for the checkpoint to be saved to.
+                            Default: 'checkpoint.pt'
+        """
+        self.patience = patience
+        self.verbose = verbose
+        self.counter = 0
+        self.best_score = None
+        self.early_stop = False
+        self.val_loss_min = np.Inf
+        self.delta = delta
+        self.path = path
+
+    def __call__(self, val_loss, model):
+
+        score = -val_loss
+
+        if self.best_score is None:
+            self.best_score = score
+            self.save_checkpoint(val_loss, model)
+        elif score < self.best_score + self.delta:
+            self.counter += 1
+            print(
+                f'EarlyStopping counter: {self.counter} out of {self.patience}')
+            if self.counter >= self.patience:
+                self.early_stop = True
+        else:
+            self.best_score = score
+            self.save_checkpoint(val_loss, model)
+            self.counter = 0
+
+    def save_checkpoint(self, val_loss, model):
+        '''Saves model when validation loss decrease.'''
+        if self.verbose:
+            print(
+                f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model to {self.path}')
+        torch.save(model.state_dict(), self.path)
+        self.val_loss_min = val_loss
+
+
+def train_model(model, optimizer, lr_to_use, training_loader, valid_loader, loss_criterion, eval_criterion,
+                patience, n_epochs, output_path):
+    # to track the training loss
+    train_losses = []
+    # to track the validation loss
+    valid_losses = []
+    # to track the average training loss per epoch
+    avg_train_losses = []
+    # to track the average validation loss per epoch
+    avg_valid_losses = []
+    # to track the evaluation score
+    eval_scores = []
+    # to track the average evaluation score per epoch
+    avg_eval_scores = []
+
+    # initialize the early_stopping object
+    early_stopping = EarlyStopping(
+        patience=patience, verbose=True, path=output_path)
+    # Initialise the One Cycle learning rate scheduler
+    lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=lr_to_use, steps_per_epoch=len(training_loader),
+                                                       epochs=NUM_EPOCHS, pct_start=0.5)
+
+    for epoch in range(1, n_epochs + 1):
+
+        ###################
+        # train the model #
+        ###################
+        model.train()  # prep model for training
+        tic = time.perf_counter()
+        print("Epoch {} of {}".format(epoch, n_epochs))
+        for batch in tqdm(training_loader, desc='Training batch',
+                                                bar_format='{l_bar}{bar:30}{r_bar}{bar:-30b}'):
+            inputs, targets = prepare_batch(batch, device)
+            # clear the gradients of all optimized variables
+            optimizer.zero_grad()
+            # forward pass: compute predicted outputs by passing inputs to the model
+            output = model(inputs)
+            # calculate the loss
+            loss = loss_criterion(output, targets)
+            # backward pass: compute gradient of the loss with respect to model parameters
+            loss.backward()
+            # perform a single optimization step (parameter update)
+            optimizer.step()
+            # update the learning rate
+            lr_scheduler.step()
+            # record training loss
+            train_losses.append(loss.item())
+
+        ######################
+        # validate the model #
+        ######################
+        model.eval()  # prep model for evaluation
+        with torch.no_grad():
+            for batch in tqdm(validation_loader, desc='Validation batch',
+                              bar_format='{l_bar}{bar:30}{r_bar}{bar:-30b}'):
+                inputs, targets = prepare_batch(batch, device)
+                # forward pass: compute predicted outputs by passing inputs to the model
+                output = model(inputs)
+                # calculate the loss
+                loss = loss_criterion(output, targets)
+                # record validation loss
+                valid_losses.append(loss.item())
+                # if model contains final_activation layer for normalizing logits apply it, otherwise
+                # the evaluation metric will be incorrectly computed
+                if hasattr(model, 'final_activation') and model.final_activation is not None:
+                    output = model.final_activation(output)
+                eval_score = eval_criterion(output, targets)
+                eval_scores.append(eval_score)
+
+        toc = time.perf_counter()
+        # print training/validation statistics
+        # calculate average loss over an epoch
+        train_loss = np.average(train_losses)
+        valid_loss = np.average(valid_losses)
+        eval_score = np.average(eval_scores)
+        avg_train_losses.append(train_loss)
+        avg_valid_losses.append(valid_loss)
+        avg_eval_scores.append(eval_score)
+        print(
+            f'Epoch {epoch}. Training loss: {train_loss}, Validation Loss: {valid_loss}. MeanIOU: {eval_score}')
+        print(f"Time taken for epoch {epoch}: {toc - tic:0.2f} seconds")
+        # clear lists to track next epoch
+        train_losses = []
+        valid_losses = []
+        eval_scores = []
+
+        # early_stopping needs the validation loss to check if it has decresed,
+        # and if it has, it will make a checkpoint of the current model
+        early_stopping(valid_loss, model)
+
+        if early_stopping.early_stop:
+            print("Early stopping")
+            break
+
+    # load the last checkpoint with the best model
+    model.load_state_dict(torch.load(output_path))
+
+    return model, avg_train_losses, avg_valid_losses, avg_eval_scores
+
+
+def output_loss_fig(train_loss, valid_loss, data_path):
+    # visualize the loss as the network trained
+    fig = plt.figure(figsize=(10, 8))
+    plt.plot(range(1, len(train_loss)+1), train_loss, label='Training Loss')
+    plt.plot(range(1, len(valid_loss)+1), valid_loss, label='Validation Loss')
+
+    # find position of lowest validation loss
+    minposs = valid_loss.index(min(valid_loss))+1
+    plt.axvline(minposs, linestyle='--', color='r',
+                label='Early Stopping Checkpoint')
+
+    plt.xlabel('epochs')
+    plt.ylabel('loss')
+    plt.ylim(0, 0.8)  # consistent scale
+    plt.xlim(0, len(train_loss)+1)  # consistent scale
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    fig_out_pth = data_path/'loss_plot.png'
+    print(f"Saving figure of training/validation losses to {fig_out_pth}")
+    fig.savefig(fig_out_pth, bbox_inches='tight')
+
+def plot_validation_slices(predicted_vol, data_path):
+    columns = 3
+    rows = 2
+    z_dim = predicted_vol.shape[0]//2
+    y_dim = predicted_vol.shape[1]//2
+    x_dim = predicted_vol.shape[2]//2
+
+    with h5.File(DATA_DIR/VALID_SEG, 'r') as f:
+        validation_gt = f['/data'][()]
+    fig = plt.figure(figsize=(12, 8))
+    pred_z = fig.add_subplot(rows, columns, 1)
+    plt.imshow(predicted_vol[z_dim, :, :], cmap='gray')
+    pred_y = fig.add_subplot(rows, columns, 2)
+    plt.imshow(predicted_vol[:, y_dim, :], cmap='gray')
+    pred_x = fig.add_subplot(rows, columns, 3)
+    plt.imshow(predicted_vol[:, :, x_dim], cmap='gray')
+    gt_z = fig.add_subplot(rows, columns, 4)
+    plt.imshow(validation_gt[z_dim, :, :], cmap='gray')
+    gt_y = fig.add_subplot(rows, columns, 5)
+    plt.imshow(validation_gt[:, y_dim, :], cmap='gray')
+    gt_x = fig.add_subplot(rows, columns, 6)
+    plt.imshow(validation_gt[:, :, x_dim], cmap='gray')
+    pred_z.title.set_text(f'z slice pred [{z_dim}, :, :]')
+    pred_y.title.set_text(f'y slice pred [:, {y_dim}, :]')
+    pred_x.title.set_text(f'x slice pred [:, :, {x_dim}]')
+    gt_z.title.set_text(f'z slice GT [{z_dim}, :, :]')
+    gt_y.title.set_text(f'y slice GT [:, {y_dim}, :]')
+    gt_x.title.set_text(f'x slice GT [:, :, {x_dim}]')
+    plt.suptitle(f"Predictions for Model", fontsize=16)
+    plt_out_pth = data_path/f'3d_prediction_images.png'
+    print(f"Saving figure of orthogonal slice predictions to {plt_out_pth}")
+    plt.savefig(plt_out_pth, dpi=150)
+
+def predict_validation_region(model, validation_dataset, validation_batch_size, thresh_val, data_path):
+    sample = validation_dataset[0]
+    patch_overlap = 16
+
+    grid_sampler = GridSampler(
+        sample,
+        PATCH_SIZE,
+        patch_overlap,
+        padding_mode='reflect'
+    )
+    patch_loader = torch.utils.data.DataLoader(
+        grid_sampler, batch_size=validation_batch_size)
+    aggregator = torchio.data.inference.GridAggregator(grid_sampler)
+
+    model.eval()
+    with torch.no_grad():
+        for patches_batch in patch_loader:
+            inputs = patches_batch[ds_data][DATA].to(device)
+            locations = patches_batch[torchio.LOCATION]
+            logits = model(inputs)
+            logits = model.final_activation(logits)
+            aggregator.add_batch(logits, locations)
+
+    predicted_vol = aggregator.get_output_tensor()  # output is 4D
+    predicted_vol = predicted_vol.numpy().squeeze() # remove first dimension
+    # Threshold
+    predicted_vol[predicted_vol >= thresh_val] = 1
+    predicted_vol[predicted_vol < thresh_val] = 0
+    predicted_vol = predicted_vol.astype(np.uint8)
+    h5_out_path = data_path/"validation_vol_predicted.h5"
+    print(f"Outputting prediction of the validation volume to {h5_out_path}")
+    with h5.File(h5_out_path, 'w') as f:
+        f['/data'] = predicted_vol
+    plot_validation_slices(predicted_vol, data_path)
+
+########## Do things here ##############
+lr_find_loss, lr_find_lr = lr_finder(unet, training_loader, optimizer, lr_scheduler)
+lr_to_use = find_appropriate_lr(unet, lr_find_loss, lr_find_lr)
+print(f"LR to use {lr_to_use}")
+
+# recreate the Unet and the optimizer
 print("Recreating the U-net and optimizer")
 unet = create_unet_on_device(device, model_dict)
 optimizer = torch.optim.AdamW(unet.parameters(), lr=STARTING_LR)
 
-
-# Now train with 1 cycle policy with max LR set between to lr_to_use
-# TODO - Put this into a function
-best_eval = 0
 model_out_path = DATA_DIR/MODEL_OUT_FN
-train_loss_lst = []
-lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=lr_to_use, steps_per_epoch=len(training_loader), epochs=NUM_EPOCHS, pct_start=0.5)
-for i in range(NUM_EPOCHS):
-    unet.train()
-    tic = time.perf_counter()
-    print("epoch {} of {}".format(i + 1, NUM_EPOCHS))
-    for batch_idx, batch in enumerate(tqdm(training_loader, desc='Training batch',
-                                                    bar_format='{l_bar}{bar:30}{r_bar}{bar:-30b}')):
-        inputs, targets = prepare_batch(batch, device)
-        output = unet(inputs)
-        loss = loss_criterion(output, targets)
-        train_loss_lst.append(loss.item())
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        lr_scheduler.step()
-    # Validate
-    val_loss_lst = []
-    val_eval_lst = []
-    unet.eval()
-    with torch.no_grad():
-        for batch_idx, batch in enumerate(tqdm(validation_loader, desc='Validation batch',
-                                                    bar_format='{l_bar}{bar:30}{r_bar}{bar:-30b}')):
-            inputs, targets = prepare_batch(batch, device)
-            output = unet(inputs)
-            val_loss = loss_criterion(output, targets)
-            val_loss_lst.append(val_loss.item())
-            # if model contains final_activation layer for normalizing logits apply it, otherwise
-            # the evaluation metric will be incorrectly computed
-            if hasattr(unet, 'final_activation') and unet.final_activation is not None:
-                output = unet.final_activation(output)
-            eval_score = eval_criterion(output, targets)
-            val_eval_lst.append(eval_score.item())
-            eval_avg = np.average(val_eval_lst)
-        print(f'Epoch {i + 1}. Training loss: {np.average(train_loss_lst)}, Validation Loss: {np.average(val_loss_lst)}. MeanIOU: {eval_avg}')
-        if eval_avg > best_eval:
-            best_eval = eval_avg
-            state_dict = unet.state_dict()
-            print(f'Saving best model with MeanIOU of {eval_avg} to {model_out_path}')
-            torch.save(state_dict, model_out_path)
-            
-    toc = time.perf_counter()
-    print(f"Time taken for epoch {i + 1}: {toc - tic:0.4f} seconds")
+model, avg_train_losses, avg_valid_losses, avg_eval_scores = train_model(unet, optimizer, lr_to_use,
+                                                                         training_loader, validation_loader, loss_criterion,
+                                                                         eval_criterion, PATIENCE, NUM_EPOCHS, model_out_path)
+fig_out_dir = DATA_DIR/f'{date.today()}_3d_training_figs'
+os.makedirs(fig_out_dir, exist_ok=True)
+output_loss_fig(avg_train_losses, avg_valid_losses, fig_out_dir)
+# TODO predict the validation volume
+predict_validation_region(unet, validation_dataset,
+                          validation_batch_size, THRESH_VAL, fig_out_dir)
