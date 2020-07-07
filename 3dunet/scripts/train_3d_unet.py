@@ -8,14 +8,15 @@ import sys
 import time
 from datetime import date
 from pathlib import Path
-import yaml
 
 import h5py as h5
 import numpy as np
 import termplotlib as tpl
 import torch
 import torchio
+import yaml
 from matplotlib import pyplot as plt
+from pytorch3dunet.unet3d.losses import BCEDiceLoss, DiceLoss
 from pytorch3dunet.unet3d.metrics import MeanIoU
 from pytorch3dunet.unet3d.model import ResidualUNet3D
 from torch import nn as nn
@@ -28,90 +29,78 @@ from torchio.transforms import (Compose, OneOf, RandomAffine, RandomBlur,
                                 RandomNoise, RescaleIntensity)
 from tqdm import tqdm
 
+real_path = os.path.realpath(__file__)
+dir_path = os.path.dirname(real_path)  # Extract the directory of the script
+settings_path = Path(dir_path, 'settings', '3d_unet_train_settings.yaml')
+print(f"Loading settings from {settings_path}")
+if settings_path.exists():
+    with open(settings_path, 'r') as stream:
+        settings_dict = yaml.safe_load(stream)
+else:
+    print("Couldn't find settings file... Exiting!")
+    sys.exit(1)
 
-# real_path = os.path.realpath(__file__)
-# dir_path = os.path.dirname(real_path)  # Extract the directory of the script
-# settings_path = Path(dir_path, 'settings', '3d_unet_train_settings.yaml')
-# print(f"Loading settings from {settings_path}")
-# if settings_path.exists():
-#     with open(settings_path, 'r') as stream:
-#         settings_dict = yaml.safe_load(stream)
-# else:
-#     print("Couldn't find settings file... Exiting!")
-#     sys.exit(1)
-
-CUDA_DEVICE = '0'  # Select a particular GPU
-STARTING_LR = 1e-6
-END_LR = 0.1
-LR_FIND_EPOCHS = 2
-DATA_DIR = Path(
-    '/dls/i12/data/2019/nt23252-1/processing/olly/200608_3d_unet_development')
-TRAIN_DATA = 'data_vol_train_384_image.h5'
-TRAIN_SEG = 'seg_vol_train_384_image.h5'  # Need to ensure values are [0,1]
-VALID_DATA = 'data_vol_valid_256_image_uint8.h5'
-VALID_SEG = 'seg_vol_valid_256_image.h5'  # Need to ensure values are [0,1]
-PATCH_SIZE = (128, 128, 128)
-TRAIN_PATCHES = 48
-VALID_PATCHES = 24
-MAX_QUEUE_LENGTH = 48
-NUM_WORKERS = 8
-MODEL_OUT_FN = '200626_3dUnet_vol3_blood_tiss_ADAMW_50_best.pytorch'
-NUM_EPOCHS = 100
-PATIENCE = 7
-THRESH_VAL = 0.5
-
-device = 0  # Once single GPU slected, default device will always be 0
-ds_data = 'data'  # Keys for accesi
-ds_label = 'label'
-
-model_dict = {
-    # model class, e.g. UNet3D, ResidualUNet3D
-    "name": "ResidualUNet3D",
-    # number of input channels to the model
-    "in_channels": 1,
-    # number of output channels
-    "out_channels": 1,
-    # determines the order of operators in a single layer (gcr - GroupNorm+Conv3d+ReLU)
-    "layer_order": "gcr",
-    # feature maps scale factor
-    "f_maps": 32,
-    # number of groups in the groupnorm
-    "num_groups": 8,
-    # apply element-wise nn.Sigmoid after the final 1x1 convolution, otherwise apply nn.Softmax
-    "final_sigmoid": True,
-    # if True applies the final normalization layer (sigmoid or softmax), otherwise the networks returns the output from the final convolution layer; use False for regression problems, e.g. de-noising
-    "is_segmentation": True
-}
-
-os.environ['CUDA_VISIBLE_DEVICES'] = CUDA_DEVICE
-
+CUDA_DEVICE = str(settings_dict['cuda_device'])  # Select a particular GPU
+STARTING_LR = float(settings_dict['starting_lr'])
+END_LR = float(settings_dict['end_lr'])
+LR_FIND_EPOCHS = settings_dict['lr_find_epochs']
+DATA_DIR = Path(settings_dict['data_dir'])
+TRAIN_DATA = DATA_DIR/settings_dict['train_data']
+TRAIN_SEG = DATA_DIR/settings_dict['train_seg']  # Need to ensure values are [0,1]
+VALID_DATA = DATA_DIR/settings_dict['valid_data']# Need to ensure values are [0,1]
+VALID_SEG = DATA_DIR/settings_dict['valid_seg']
+PATCH_SIZE = tuple(settings_dict['patch_size'])
+TRAIN_PATCHES = settings_dict['train_patches']
+VALID_PATCHES = settings_dict['valid_patches']
+MAX_QUEUE_LENGTH = settings_dict['max_queue_length']
+NUM_WORKERS = settings_dict['num_workers']
+MODEL_DICT = settings_dict['model']
+MODEL_OUT_FN = settings_dict['model_out_fn']
+NUM_EPOCHS = settings_dict['num_epochs']
+PATIENCE = settings_dict['patience']
+THRESH_VAL = settings_dict['thresh_val']
+DEVICE_NUM = 0  # Once single GPU slected, default device will always be 0
+LOSS_CRITERION = settings_dict['loss_criterion']
+ALPHA = settings_dict['alpha']
+BETA = settings_dict['beta']
 
 def create_unet_on_device(device, model_dict):
     unet = ResidualUNet3D(**model_dict)
     print(f"Sending the model to device {CUDA_DEVICE}")
     return unet.to(device)
 
-
 def tensor_from_hdf5(file_path, data_path):
     with h5.File(file_path, 'r') as f:
         tens = torch.from_numpy(f[data_path][()])
     return tens
 
+os.environ['CUDA_VISIBLE_DEVICES'] = CUDA_DEVICE
+unet = create_unet_on_device(DEVICE_NUM, MODEL_DICT)
 
-unet = create_unet_on_device(device, model_dict)
-
-# Get the loss function - TODO make this changable accroding to number of classes in segmentation
-loss_criterion = nn.BCEWithLogitsLoss()
+# Get the loss function - TODO make this changeable according to number of classes in segmentation
+# loss_criterion = nn.BCEWithLogitsLoss()
+if LOSS_CRITERION == 'BCEDiceLoss':
+    print(f"Using combined BCE and Dice loss with weighting of {ALPHA}*BCE and {BETA}*Dice")
+    loss_criterion = BCEDiceLoss(ALPHA, BETA)
+elif LOSS_CRITERION == 'DiceLoss':
+    print("Using DiceLoss")
+    loss_criterion = DiceLoss(ALPHA, BETA)
+elif LOSS_CRITERION == 'BCELoss':
+    print("Using DiceLoss")
+    loss_criterion = nn.BCEWithLogitsLoss()
+else:
+    print("No loss criterion specified, exiting")
+    sys.exit(1)
 # Get evaluation metric
 eval_criterion = MeanIoU()
 # Create optimizer
 optimizer = torch.optim.AdamW(unet.parameters(), lr=STARTING_LR)
 
 # Load the data into tensors
-train_data_tens = tensor_from_hdf5(DATA_DIR/TRAIN_DATA, '/data')
-train_seg_tens = tensor_from_hdf5(DATA_DIR/TRAIN_SEG, '/data')
-valid_data_tens = tensor_from_hdf5(DATA_DIR/VALID_DATA, '/data')
-valid_seg_tens = tensor_from_hdf5(DATA_DIR/VALID_SEG, '/data')
+train_data_tens = tensor_from_hdf5(TRAIN_DATA, '/data')
+train_seg_tens = tensor_from_hdf5(TRAIN_SEG, '/data')
+valid_data_tens = tensor_from_hdf5(VALID_DATA, '/data')
+valid_seg_tens = tensor_from_hdf5(VALID_SEG, '/data')
 
 # Ceate a queue with patch based sampling
 train_subject = torchio.Subject(
@@ -141,8 +130,8 @@ validation_dataset = torchio.ImagesDataset(
     [valid_subject])
 
 
-total_gpu_mem = torch.cuda.get_device_properties(device).total_memory
-allocated_gpu_mem = torch.cuda.memory_allocated(device)
+total_gpu_mem = torch.cuda.get_device_properties(DEVICE_NUM).total_memory
+allocated_gpu_mem = torch.cuda.memory_allocated(DEVICE_NUM)
 free_gpu_mem = (total_gpu_mem - allocated_gpu_mem) / 1024**3  # free
 
 if free_gpu_mem < 20:
@@ -185,8 +174,8 @@ validation_loader = torch.utils.data.DataLoader(
 
 
 def prepare_batch(batch, device):
-    inputs = batch[ds_data][DATA].to(device)
-    targets = batch[ds_label][DATA].to(device)
+    inputs = batch['data'][DATA].to(device)
+    targets = batch['label'][DATA].to(device)
     return inputs, targets
 
 
@@ -214,7 +203,7 @@ def lr_finder(model, training_loader, optimizer, lr_scheduler, smoothing=0.05, p
     for i in range(LR_FIND_EPOCHS):
         for batch in tqdm(training_loader, desc=f'Epoch {i + 1}, batch number',
                           bar_format='{l_bar}{bar:30}{r_bar}{bar:-30b}'):
-            inputs, targets = prepare_batch(batch, device)
+            inputs, targets = prepare_batch(batch, DEVICE_NUM)
             optimizer.zero_grad()
             output = model(inputs)
             loss = loss_criterion(output, targets)
@@ -233,7 +222,7 @@ def lr_finder(model, training_loader, optimizer, lr_scheduler, smoothing=0.05, p
 
     if plt_fig:
         fig = tpl.figure()
-        fig.plot(lr_find_lr, lr_find_loss, width=50, height=30, xlabel='Learning Rate')
+        fig.plot(np.log10(lr_find_lr), lr_find_loss, width=50, height=30, xlabel='Log10 Learning Rate')
         fig.show()
 
     return lr_find_loss, lr_find_lr
@@ -354,7 +343,7 @@ def train_model(model, optimizer, lr_to_use, training_loader, valid_loader, loss
         print("Epoch {} of {}".format(epoch, n_epochs))
         for batch in tqdm(training_loader, desc='Training batch',
                                                 bar_format='{l_bar}{bar:30}{r_bar}{bar:-30b}'):
-            inputs, targets = prepare_batch(batch, device)
+            inputs, targets = prepare_batch(batch, DEVICE_NUM)
             # clear the gradients of all optimized variables
             optimizer.zero_grad()
             # forward pass: compute predicted outputs by passing inputs to the model
@@ -377,7 +366,7 @@ def train_model(model, optimizer, lr_to_use, training_loader, valid_loader, loss
         with torch.no_grad():
             for batch in tqdm(validation_loader, desc='Validation batch',
                               bar_format='{l_bar}{bar:30}{r_bar}{bar:-30b}'):
-                inputs, targets = prepare_batch(batch, device)
+                inputs, targets = prepare_batch(batch, DEVICE_NUM)
                 # forward pass: compute predicted outputs by passing inputs to the model
                 output = model(inputs)
                 # calculate the loss
@@ -494,7 +483,7 @@ def predict_validation_region(model, validation_dataset, validation_batch_size, 
     model.eval()
     with torch.no_grad():
         for patches_batch in patch_loader:
-            inputs = patches_batch[ds_data][DATA].to(device)
+            inputs = patches_batch['data'][DATA].to(DEVICE_NUM)
             locations = patches_batch[torchio.LOCATION]
             logits = model(inputs)
             logits = model.final_activation(logits)
@@ -519,7 +508,7 @@ print(f"LR to use {lr_to_use}")
 
 # recreate the Unet and the optimizer
 print("Recreating the U-net and optimizer")
-unet = create_unet_on_device(device, model_dict)
+unet = create_unet_on_device(DEVICE_NUM, MODEL_DICT)
 optimizer = torch.optim.AdamW(unet.parameters(), lr=STARTING_LR)
 
 model_out_path = DATA_DIR/MODEL_OUT_FN
