@@ -16,8 +16,8 @@ patience: 7 # Number of epoch to wait before early stopping if validation loss d
 # Parameters for generating training patches
 patch_size:
   [128, 128, 128]
-train_patches: 48 # Number of patches to sample from the training voulume
-valid_patches: 24 # Number of patches to sample from the validation voulume
+train_patches: 48 # Number of patches to sample from the training volume
+valid_patches: 12 # Number of patches to sample from the validation volume
 max_queue_length: 48 # Maximum queue of pathches to create (the larger the number the more RAM required)
 num_workers: 8 # Number of processor cores to use to generate patches
 
@@ -43,6 +43,6 @@ model:
   # returns the output from the final convolution layer; use False for regression problems, e.g. de-noising
   is_segmentation: true
 
-loss_criterion: BCEDiceLoss # Choose from one of [BCEDiceLoss, BCELoss, DiceLoss]
+loss_criterion: BCELoss # Choose from one of [BCEDiceLoss, BCELoss, DiceLoss]
 alpha: 0.75 # When BCEDiceLoss selected, weighting for BCELoss
 beta: 0.25 # When BCEDiceLoss selected, weighting for DiceLoss
