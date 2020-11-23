@@ -122,9 +122,9 @@ allocated_gpu_mem = torch.cuda.memory_allocated(DEVICE_NUM)
 free_gpu_mem = (total_gpu_mem - allocated_gpu_mem) / 1024**3  # free
 
 if free_gpu_mem < 30:
-    batch_size = 4  # Set to 4 for 16Gb Card
+    batch_size = 2  # Set to 4 for 16Gb Card - changed to 2 for large patch size
 else:
-    batch_size = 8  # Set to 8 for 32Gb Card
+    batch_size = 3  # Set to 8 for 32Gb Card
 print(f"Patch size is {PATCH_SIZE}")
 print(f"Free GPU memory is {free_gpu_mem:0.2f} GB. Batch size will be "
       f"{batch_size}.")

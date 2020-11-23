@@ -2,6 +2,7 @@
  truth HDF5 input volumes. A separate set of data and ground truth volumes are
  required for validation.
 """
+import csv
 import math
 import os
 import sys
@@ -16,8 +17,9 @@ import torch
 import torchio
 import yaml
 from matplotlib import pyplot as plt
-from pytorch3dunet.unet3d.losses import BCEDiceLoss, DiceLoss
-from pytorch3dunet.unet3d.metrics import MeanIoU
+from pytorch3dunet.unet3d.losses import (BCEDiceLoss, DiceLoss,
+                                         GeneralizedDiceLoss)
+from pytorch3dunet.unet3d.metrics import GenericAveragePrecision, MeanIoU
 from pytorch3dunet.unet3d.model import ResidualUNet3D
 from torch import nn as nn
 from torch.utils.data import DataLoader
@@ -32,7 +34,8 @@ from early_stopping import EarlyStopping
 
 real_path = os.path.realpath(__file__)
 dir_path = os.path.dirname(real_path)  # Extract the directory of the script
-settings_path = Path(dir_path, 'settings', '3d_unet_train_settings.yaml')
+settings_path = Path(dir_path, 'settings',
+                     '201122_89062_SBvM_RP_3d_unet_train_BCEL_p40_paper.yaml')
 print(f"Loading settings from {settings_path}")
 if settings_path.exists():
     with open(settings_path, 'r') as stream:
@@ -61,6 +64,7 @@ NUM_EPOCHS = settings_dict['num_epochs']
 PATIENCE = settings_dict['patience']
 THRESH_VAL = settings_dict['thresh_val']
 LOSS_CRITERION = settings_dict['loss_criterion']
+EVAL_METRIC = settings_dict['eval_metric']
 ALPHA = settings_dict['alpha']
 BETA = settings_dict['beta']
 DEVICE_NUM = 0  # Once single GPU slected, default device will always be 0
@@ -295,7 +299,7 @@ def train_model(model, optimizer, lr_to_use, training_loader, valid_loader,
         avg_eval_scores.append(eval_score)
         print(
             f"Epoch {epoch}. Training loss: {train_loss}, Validation Loss: "
-            f"{valid_loss}. MeanIOU: {eval_score}")
+            f"{valid_loss}. {EVAL_METRIC}: {eval_score}")
         print(f"Time taken for epoch {epoch}: {toc - tic:0.2f} seconds")
         # clear lists to track next epoch
         train_losses = []
@@ -316,7 +320,7 @@ def train_model(model, optimizer, lr_to_use, training_loader, valid_loader,
     return model, avg_train_losses, avg_valid_losses, avg_eval_scores
 
 
-def output_loss_fig(train_loss, valid_loss, data_path):
+def output_loss_fig_data(train_loss, valid_loss, avg_eval_scores, data_path):
     # visualize the loss as the network trained
     fig = plt.figure(figsize=(10, 8))
     plt.plot(range(1, len(train_loss)+1), train_loss, label='Training Loss')
@@ -329,19 +333,28 @@ def output_loss_fig(train_loss, valid_loss, data_path):
 
     plt.xlabel('epochs')
     plt.ylabel('loss')
-    plt.ylim(0, 0.8)  # consistent scale
+    #plt.ylim(0, 0.8)  # consistent scale
     plt.xlim(0, len(train_loss)+1)  # consistent scale
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
-    fig_out_pth = data_path/'loss_plot.png'
+    fig_out_pth = data_path/f'{MODEL_OUT_FN[:-8]}_loss_plot.png'
     print(f"Saving figure of training/validation losses to {fig_out_pth}")
     fig.savefig(fig_out_pth, bbox_inches='tight')
+    # Output a list of training stats
+    epoch_lst = range(len(train_loss))
+    rows = zip(epoch_lst, train_loss, valid_loss, avg_eval_scores)
+    with open(data_path/f'{MODEL_OUT_FN[:-8]}_train_stats.csv', 'w') as f:
+        writer = csv.writer(f)
+        writer.writerow(('Epoch', 'Train Loss', 'Valid Loss', 'Eval Score'))
+        for row in rows:
+            writer.writerow(row)
 
 
 def plot_validation_slices(predicted_vol, data_path, filename):
     columns = 3
     rows = 2
+    #predicted_vol = np.argmax(predicted_vol, axis=0) # do this if multichannel
     z_dim = predicted_vol.shape[0]//2
     y_dim = predicted_vol.shape[1]//2
     x_dim = predicted_vol.shape[2]//2
@@ -361,14 +374,14 @@ def plot_validation_slices(predicted_vol, data_path, filename):
     plt.imshow(validation_gt[:, y_dim, :], cmap='gray')
     gt_x = fig.add_subplot(rows, columns, 6)
     plt.imshow(validation_gt[:, :, x_dim], cmap='gray')
-    pred_z.title.set_text(f'z slice pred [{z_dim}, :, :]')
-    pred_y.title.set_text(f'y slice pred [:, {y_dim}, :]')
-    pred_x.title.set_text(f'x slice pred [:, :, {x_dim}]')
-    gt_z.title.set_text(f'z slice GT [{z_dim}, :, :]')
-    gt_y.title.set_text(f'y slice GT [:, {y_dim}, :]')
-    gt_x.title.set_text(f'x slice GT [:, :, {x_dim}]')
+    pred_z.title.set_text(f'x,y slice pred [{z_dim}, :, :]')
+    pred_y.title.set_text(f'z,x slice pred [:, {y_dim}, :]')
+    pred_x.title.set_text(f'z,y slice pred [:, :, {x_dim}]')
+    gt_z.title.set_text(f'x,y slice GT [{z_dim}, :, :]')
+    gt_y.title.set_text(f'z,x slice GT [:, {y_dim}, :]')
+    gt_x.title.set_text(f'z,y slice GT [:, :, {x_dim}]')
     plt.suptitle(f"Predictions for {filename}", fontsize=16)
-    plt_out_pth = data_path/'3d_prediction_images.png'
+    plt_out_pth = data_path/f'{filename[:-8]}_3d_prediction_images.png'
     print(f"Saving figure of orthogonal slice predictions to {plt_out_pth}")
     plt.savefig(plt_out_pth, dpi=150)
 
@@ -376,7 +389,7 @@ def plot_validation_slices(predicted_vol, data_path, filename):
 def predict_validation_region(model, validation_dataset, validation_batch_size,
                               thresh_val, data_path):
     sample = validation_dataset[0]
-    patch_overlap = 16
+    patch_overlap = 32
 
     grid_sampler = GridSampler(
         sample,
@@ -394,17 +407,25 @@ def predict_validation_region(model, validation_dataset, validation_batch_size,
             inputs = patches_batch['data'][DATA].to(DEVICE_NUM)
             locations = patches_batch[torchio.LOCATION]
             logits = model(inputs)
-            logits = model.final_activation(logits)
+            if (hasattr(model, 'final_activation')
+                    and model.final_activation is not None):
+                logits = model.final_activation(logits)
             aggregator.add_batch(logits, locations)
 
     predicted_vol = aggregator.get_output_tensor()  # output is 4D
+    print(f"Shape of the predicted Volume is: {predicted_vol.shape}")
     predicted_vol = predicted_vol.numpy().squeeze()  # remove first dimension
-    # Threshold
+    h5_out_path = data_path/f"{MODEL_OUT_FN[:-8]}_validation_vol_predicted.h5"
+    print(f"Outputting prediction of the validation volume to {h5_out_path}")
+    with h5.File(h5_out_path, 'w') as f:
+        f['/data'] = predicted_vol
+    #Threshold if binary
     predicted_vol[predicted_vol >= thresh_val] = 1
     predicted_vol[predicted_vol < thresh_val] = 0
     predicted_vol = predicted_vol.astype(np.uint8)
-    h5_out_path = data_path/"validation_vol_predicted.h5"
-    print(f"Outputting prediction of the validation volume to {h5_out_path}")
+    h5_out_path = data_path/f"{MODEL_OUT_FN[:-8]}_validation_vol_pred_thresh.h5"
+    print(f"Outputting prediction of the thresholded validation volume "
+          f"to {h5_out_path}")
     with h5.File(h5_out_path, 'w') as f:
         f['/data'] = predicted_vol
     plot_validation_slices(predicted_vol, data_path, MODEL_OUT_FN)
@@ -425,15 +446,30 @@ if LOSS_CRITERION == 'BCEDiceLoss':
     loss_criterion = BCEDiceLoss(ALPHA, BETA)
 elif LOSS_CRITERION == 'DiceLoss':
     print("Using DiceLoss")
-    loss_criterion = DiceLoss(ALPHA, BETA)
+    loss_criterion = DiceLoss(weight=torch.tensor([0.5, 0.5, 1],
+                              device='cuda:0'))
 elif LOSS_CRITERION == 'BCELoss':
     print("Using BCELoss")
     loss_criterion = nn.BCEWithLogitsLoss()
+elif LOSS_CRITERION == 'CrossEntropyLoss':
+    print("Using CrossEntropyLoss")
+    loss_criterion = nn.CrossEntropyLoss()
+elif LOSS_CRITERION == 'GeneralizedDiceLoss':
+    print("Using GeneralizedDiceLoss")
+    loss_criterion = GeneralizedDiceLoss()
 else:
     print("No loss criterion specified, exiting")
     sys.exit(1)
 # Get evaluation metric
-eval_criterion = MeanIoU()
+if EVAL_METRIC == "MeanIoU":
+    print("Using MeanIoU")
+    eval_criterion = MeanIoU()
+elif EVAL_METRIC == "GenericAveragePrecision":
+    print("Using GenericAveragePrecision")
+    eval_criterion = GenericAveragePrecision()
+else:
+    print("No evaluation metric specified, exiting")
+    sys.exit(1)
 # Create optimizer
 optimizer = torch.optim.AdamW(unet.parameters(), lr=STARTING_LR)
 
@@ -453,7 +489,6 @@ valid_subject = torchio.Subject(
 )
 # Define the transforms for the set of training patches
 training_transform = Compose([
-    RescaleIntensity((0, 1)),
     RandomNoise(p=0.2),
     RandomFlip(axes=(0, 1, 2)),
     RandomBlur(p=0.2),
@@ -497,7 +532,7 @@ free_gpu_mem = (total_gpu_mem - allocated_gpu_mem) / 1024**3  # free
 if free_gpu_mem < 30:
     batch_size = 2  # Set to 2 for 16Gb Card
 else:
-    batch_size = 4  # Set to 4 for 32Gb Card
+    batch_size = 2  # Set to 4 for 32Gb Card
 print(f"Patch size is {PATCH_SIZE}")
 print(f"Free GPU memory is {free_gpu_mem:0.2f} GB. Batch size will be "
       f"{batch_size}.")
@@ -527,9 +562,10 @@ model_out_path = DATA_DIR/MODEL_OUT_FN
 output_tuple = train_model(unet, optimizer, lr_to_use, training_loader,
                            validation_loader, loss_criterion, eval_criterion,
                            PATIENCE, NUM_EPOCHS, model_out_path)
-model, avg_train_losses, avg_valid_losses, avg_eval_scores = output_tuple
-fig_out_dir = DATA_DIR/f'{date.today()}_3d_training_figs'
+unet, avg_train_losses, avg_valid_losses, avg_eval_scores = output_tuple
+fig_out_dir = DATA_DIR/f'{date.today()}_3d_train_figs'
 os.makedirs(fig_out_dir, exist_ok=True)
-output_loss_fig(avg_train_losses, avg_valid_losses, fig_out_dir)
+output_loss_fig_data(avg_train_losses, avg_valid_losses,
+                     avg_eval_scores, fig_out_dir)
 predict_validation_region(unet, validation_dataset,
                           batch_size, THRESH_VAL, fig_out_dir)
