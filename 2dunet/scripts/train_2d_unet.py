@@ -1,4 +1,5 @@
 import os
+import sys
 import warnings
 import yaml
 import glob
@@ -17,9 +18,9 @@ from skimage.transform import resize
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
-real_path = os.path.realpath(__file__ ) 
-dir_path = os.path.dirname(real_path) # Extract the directory of the script
-settings_path = Path(dir_path,'settings','2d_unet_train_settings.yaml')
+real_path = os.path.realpath(__file__) 
+dir_path = os.path.dirname(real_path)  # Extract the directory of the script
+settings_path = Path(dir_path, 'settings', '2d_unet_train_settings.yaml')
 print(f"Loading settings from {settings_path}")
 if settings_path.exists():
     with open(settings_path, 'r') as stream:
@@ -37,12 +38,13 @@ DATA_IM_OUT_DIR = OUT_ROOT_DIR/settings_dict['data_im_dirname']
 SEG_IM_OUT_DIR = OUT_ROOT_DIR/settings_dict['seg_im_out_dirname']
 MODEL_OUTPUT_FN = settings_dict['model_output_fn']
 CODES = settings_dict['codes']
-IMAGE_SIZE = settings_dict['image_size'] # Image size used in the Unet
-WEIGHT_DECAY = float(settings_dict['weight_decay']) # weight decay 
-PCT_LR_INC = settings_dict['pct_lr_inc'] # the percentage of overall iterations where the LR is increasin
-NUM_CYC_FROZEN = settings_dict['num_cyc_frozen'] # Number of times to run fit_one_cycle on frozen unet model
-NUM_CYC_UNFROZEN = settings_dict['num_cyc_unfrozen'] # Number of times to run fit_one_cycle on unfrozen unet model
-
+NORMALIZE = settings_dict['normalize']
+IMAGE_SIZE = settings_dict['image_size']  # Image size used in the Unet
+WEIGHT_DECAY = float(settings_dict['weight_decay'])  # weight decay 
+PCT_LR_INC = settings_dict['pct_lr_inc']  # the percentage of overall iterations where the LR is increasin
+NUM_CYC_FROZEN = settings_dict['num_cyc_frozen']  # Number of times to run fit_one_cycle on frozen unet model
+NUM_CYC_UNFROZEN = settings_dict['num_cyc_unfrozen']  # Number of times to run fit_one_cycle on unfrozen unet model
+multilabel = False   # Set flag to false for binary segmentation true for n classes > 2
 ############# Data preparation #################
 
 def da_from_data(path):    
@@ -51,13 +53,14 @@ def da_from_data(path):
     return da.from_array(d, chunks='auto')
 
 def output_im(data, path, offset, crop_val, normalize=False, label=False):
-    data = data.compute()
+    if isinstance(data, da.core.Array):
+        data = data.compute()
     if normalize:
         data_st_dev = np.std(data)
         data = np.clip(data, None, data_st_dev * 3) # 99.7% of values withing 3 stdevs
-        data = exposure.rescale_intensity(data, out_range='float')
+        data = exposure.rescale_intensity(data)
         data = img_as_ubyte(data)
-    if label:
+    if label and not multilabel:
         data[data > 1] = 1
     # Crop the image
     if offset and crop_val:
@@ -90,17 +93,43 @@ def output_slices_to_disk(axis, data_path, output_path, name_prefix, offset, cro
 data_vol = da_from_data(DATA_VOL_PATH)
 seg_vol = da_from_data(SEG_VOL_PATH)
 
+# Check that we have the right number of classes in the seg volume
+seg_classes = np.unique(seg_vol.compute())
+num_seg_classes = len(seg_classes)
+print(f"Number of classes in segmentation dataset: {num_seg_classes}")
+num_codes = len(CODES)
+if num_seg_classes != num_codes:
+    print(f"{num_codes} classes were specified in the settings file, however "
+          f"the data contains {num_seg_classes} classes. Exiting.")
+    sys.exit(1)
+if num_seg_classes > 2:
+    multilabel = True
+
+    
+# Make sure label classes start from 0
+def fix_label_classes(seg_vol, seg_classes):
+    if isinstance(seg_vol, da.core.Array):
+        seg_vol = seg_vol.compute()
+    for idx, current in enumerate(seg_classes):
+        seg_vol[seg_vol == current] = idx
+    return seg_vol
+
+if seg_classes[0] != 0:
+    print("Fixing label classes")
+    seg_vol = fix_label_classes(seg_vol, seg_classes)
+
 # Output the normalised data slices
 print("Slicing data volume in 3 directions and outputting to disk")
 os.makedirs(DATA_IM_OUT_DIR, exist_ok=True)
-output_slices_to_disk('all', data_vol, DATA_IM_OUT_DIR, 'data', None, None, normalize=True)
+output_slices_to_disk('all', data_vol, DATA_IM_OUT_DIR, 'data', None, None,
+                      normalize=NORMALIZE)
 # Output the seg slices
 print("Slicing segemented volume in 3 directions and outputting to disk")
 os.makedirs(SEG_IM_OUT_DIR, exist_ok=True)
 output_slices_to_disk('all', seg_vol, SEG_IM_OUT_DIR, 'seg', None, None, label=True)
 
 ############# Unet Training #################
-# Need to define a binary label list class
+# Need to define a binary label list class for binary segmenation
 class BinaryLabelList(SegmentationLabelList):
     def open(self, fn): return open_mask(fn)
 
@@ -147,7 +176,10 @@ def find_appropriate_lr(model:Learner, lr_diff:int = 15, loss_threshold:float = 
     return lr_to_use
 
 # Create a metric for asessing performance
-metrics=[partial(dice, iou=True)]
+def accuracy(input, target):
+    target = target.squeeze(1)
+    return (input.argmax(dim=1) == target).float().mean()
+
 
 # Get the data filenames
 fnames = get_image_files(DATA_IM_OUT_DIR)
@@ -160,26 +192,41 @@ free = gpu_mem_get_free_no_cache()
 # the max size of bs depends on the available GPU RAM
 if free > 8200: bs=8
 else:           bs=4
-print(f"using bs={bs}, have {free}MB of GPU RAM free")
+print(f"using bs={bs}, have {free} MB of GPU RAM free")
 
-# Create the training and test set
+if multilabel:
+    print(f"Performing multilabel segmentation since there are "
+          f"{num_seg_classes} classes")
+    metrics = accuracy
+    monitor = 'accuracy'
+    loss_func = None
+else:
+    print(f"Performing binary segmentation since there are "
+          f"{num_seg_classes} classes")
+    metrics = [partial(dice, iou=True)]
+    monitor = 'dice'
+    loss_func = bce_loss
+    
+ # Create the training and test set
 print("Creating training dataset from saved images.")
-# np.random.seed(42)
-src = (BinaryItemList.from_folder(DATA_IM_OUT_DIR)
+src = (SegmentationItemList.from_folder(DATA_IM_OUT_DIR)
        .split_by_rand_pct()
        .label_from_func(get_y_fn, classes=CODES))
 data = (src.transform(get_transforms(), size=IMAGE_SIZE, tfm_y=True)
         .databunch(bs=bs)
         .normalize(imagenet_stats))
-
 # Create the Unet
 print("Creating Unet for training.")
-learn = unet_learner(data, models.resnet34, metrics=metrics, wd=WEIGHT_DECAY, loss_func=bce_loss,
-callback_fns=[partial(CSVLogger, filename='unet_training_history', append=True),
-partial(SaveModelCallback, monitor='dice', mode='max', name="best_unet_model")])
+learn = unet_learner(data, models.resnet34, metrics=metrics, wd=WEIGHT_DECAY,
+                     loss_func=loss_func,
+                     callback_fns=[partial(CSVLogger,
+                                           filename='unet_training_history',
+                                           append=True),
+                                   partial(SaveModelCallback,
+                                           monitor=monitor, mode='max',
+                                           name="best_unet_model")])
 
-
-#  Find a decnt learning rate and Do some learning on the frozen model
+#  Find a decent learning rate and Do some learning on the frozen model
 if NUM_CYC_FROZEN > 0: 
     print("Finding learning rate for frozen Unet model.")
     lr_to_use = find_appropriate_lr(learn)
@@ -209,7 +256,7 @@ for fn in filename_list:
 for img in img_list:
     pred_list.append(img_as_ubyte(learn.predict(img)[1][0]))
 # Horrible conversion from Fastai image to unit8 data array
-img_list = [img_as_ubyte(exposure.rescale_intensity(x.data.numpy()[0, :, :], out_range='float')) for x in img_list]
+img_list = [img_as_ubyte(exposure.rescale_intensity(x.data.numpy()[0, :, :])) for x in img_list]
 
 # Create the plot
 fig=plt.figure(figsize=(12, 12))

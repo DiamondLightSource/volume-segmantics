@@ -17,10 +17,8 @@ from tqdm import tqdm
 import numpy as np
 import dask.array as da
 import h5py as h5
-from fastai.vision import *
-from fastai.utils.mem import *
-from skimage import img_as_ubyte, io, exposure, img_as_float
-from skimage.transform import resize
+from pathlib import Path
+from skimage import exposure, img_as_ubyte
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -54,8 +52,13 @@ LEARNER_ROOT_PATH = Path(settings_dict['model_root_path'])
 LEARNER_FILE = settings_dict['model_file']
 CONSENSUS_VALS = map(int, settings_dict['consensus_vals'])
 NORMALISE = settings_dict['normalise']
+CUDA_DEVICE = str(settings_dict['cuda_device'])
 
-
+print(f"Setting device {CUDA_DEVICE}")
+os.environ['CUDA_VISIBLE_DEVICES'] = CUDA_DEVICE
+from fastai.vision import *
+from fastai.utils.mem import *
+from skimage import img_as_ubyte, io, exposure, img_as_float
 ######## Utility functions ############
 makedirs = partial(os.makedirs, exist_ok=True)
 def da_from_data(path):    
@@ -194,8 +197,7 @@ def threshold(input_path, range_list):
 
 
 ######## Do stuff here #########
-
-# Make a root directory for the ouitput
+# Make a root directory for the output
 makedirs(ROOT_PATH)
 # Load the data volume and the model
 data_arr = da_from_data(DATA_VOL_PATH)
