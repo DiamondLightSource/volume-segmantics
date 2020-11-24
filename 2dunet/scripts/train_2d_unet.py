@@ -1,8 +1,10 @@
+import argparse
 import os
 import sys
 import warnings
 import yaml
 import glob
+from datetime import date
 from tqdm import tqdm
 
 import dask.array as da
@@ -17,10 +19,8 @@ from skimage.transform import resize
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
-
-real_path = os.path.realpath(__file__) 
-dir_path = os.path.dirname(real_path)  # Extract the directory of the script
-settings_path = Path(dir_path, 'settings', '2d_unet_train_settings.yaml')
+root_path = Path.cwd()  # For module load script, use the CWD
+settings_path = Path(root_path, 'unet-settings', '2d_unet_train_settings.yaml')
 print(f"Loading settings from {settings_path}")
 if settings_path.exists():
     with open(settings_path, 'r') as stream:
@@ -29,21 +29,41 @@ else:
     print("Couldn't find settings file... Exiting!")
     sys.exit(1)
 
+def init_argparse() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        usage="%(prog)s [path/to/data/file.h5] [path/to/segmentation/file.h5]",
+        description="Train a 2d U-net model on the 3d data and corresponding"\
+        "segmentation provided in the files."
+    )
+    parser.add_argument(
+        "-v", "--version", action="version",
+        version=f"{parser.prog} version 1.0.0"
+    )
+    parser.add_argument('data_vol_path', metavar='Image data file path', type=str,
+                        help='the path to an HDF5 file containing the imaging data volume.')
+    parser.add_argument('seg_vol_path', metavar='Segmentation file path', type=str,
+                        help='the path to an HDF5 file containing a segmented volume.')
+    return parser
+
+parser = init_argparse()
+args = parser.parse_args()
+data_vol_path = Path(args.data_vol_path)
+seg_vol_path = Path(args.seg_vol_path)
+if not seg_vol_path.is_file() or not data_vol_path.is_file():
+    print(f"One or more of the given paths does not appear to specify a file. Exiting!")
+    sys.exit(1)
+
 # Input/output Paths
-IN_ROOT_DIR = Path(settings_dict['in_root_dir'])
-DATA_VOL_PATH = IN_ROOT_DIR/settings_dict['data_vol_filename']
-SEG_VOL_PATH = IN_ROOT_DIR/settings_dict['seg_vol_filename']
-OUT_ROOT_DIR = Path(settings_dict['out_root_dir'])
-DATA_IM_OUT_DIR = OUT_ROOT_DIR/settings_dict['data_im_dirname']
-SEG_IM_OUT_DIR = OUT_ROOT_DIR/settings_dict['seg_im_out_dirname']
+DATA_IM_OUT_DIR = root_path/settings_dict['data_im_dirname']
+SEG_IM_OUT_DIR = root_path/settings_dict['seg_im_out_dirname']
 MODEL_OUTPUT_FN = settings_dict['model_output_fn']
-CODES = settings_dict['codes']
-NORMALIZE = settings_dict['normalize']
+NORMALISE = settings_dict['normalise']
 IMAGE_SIZE = settings_dict['image_size']  # Image size used in the Unet
 WEIGHT_DECAY = float(settings_dict['weight_decay'])  # weight decay 
 PCT_LR_INC = settings_dict['pct_lr_inc']  # the percentage of overall iterations where the LR is increasin
 NUM_CYC_FROZEN = settings_dict['num_cyc_frozen']  # Number of times to run fit_one_cycle on frozen unet model
 NUM_CYC_UNFROZEN = settings_dict['num_cyc_unfrozen']  # Number of times to run fit_one_cycle on unfrozen unet model
+ST_DEV_FACTOR = 2.575 # 99% of values lie within 2.575 stdevs of the mean
 multilabel = False   # Set flag to false for binary segmentation true for n classes > 2
 ############# Data preparation #################
 
@@ -52,14 +72,9 @@ def da_from_data(path):
     d = f['/data']
     return da.from_array(d, chunks='auto')
 
-def output_im(data, path, offset, crop_val, normalize=False, label=False):
+def output_im(data, path, offset, crop_val, label=False):
     if isinstance(data, da.core.Array):
         data = data.compute()
-    if normalize:
-        data_st_dev = np.std(data)
-        data = np.clip(data, None, data_st_dev * 3) # 99.7% of values withing 3 stdevs
-        data = exposure.rescale_intensity(data)
-        data = img_as_ubyte(data)
     if label and not multilabel:
         data[data > 1] = 1
     # Crop the image
@@ -67,7 +82,7 @@ def output_im(data, path, offset, crop_val, normalize=False, label=False):
         data = data[offset:crop_val, offset:crop_val]
     io.imsave(f'{path}.png', data)
 
-def output_slices_to_disk(axis, data_path, output_path, name_prefix, offset, crop_val, normalize=False, label=False):
+def output_slices_to_disk(axis, data_path, output_path, name_prefix, offset, crop_val, label=False):
     data_arr = data_path
     shape_tup = data_arr.shape
     # There has to be a cleverer way to do this!
@@ -75,36 +90,30 @@ def output_slices_to_disk(axis, data_path, output_path, name_prefix, offset, cro
         print('Outputting z stack')
         for val in tqdm(range(shape_tup[0])):
             out_path = output_path/f"{name_prefix}_z_stack_{val}"
-            output_im(data_arr[val, :, :], out_path, offset, crop_val, normalize, label)
+            output_im(data_arr[val, :, :], out_path, offset, crop_val, label)
     if axis in ['x', 'all']:
         print('Outputting x stack')
         for val in tqdm(range(shape_tup[1])):
             out_path = output_path/f"{name_prefix}_x_stack_{val}"
-            output_im(data_arr[:, val, :], out_path, offset, crop_val, normalize, label)
+            output_im(data_arr[:, val, :], out_path, offset, crop_val, label)
     if axis in ['y', 'all']:
         print('Outputting y stack')
         for val in tqdm(range(shape_tup[2])):
             out_path = output_path/f"{name_prefix}_y_stack_{val}"
-            output_im(data_arr[:, :, val], out_path, offset, crop_val, normalize, label)
+            output_im(data_arr[:, :, val], out_path, offset, crop_val, label)
     if axis not in ['x', 'y', 'z', 'all']:
         print("Axis should be one of: [all, x, y, or z]!")
 
 # Read in the data and ground truth volumes
-data_vol = da_from_data(DATA_VOL_PATH)
-seg_vol = da_from_data(SEG_VOL_PATH)
+data_vol = da_from_data(data_vol_path)
+seg_vol = da_from_data(seg_vol_path)
 
-# Check that we have the right number of classes in the seg volume
 seg_classes = np.unique(seg_vol.compute())
 num_seg_classes = len(seg_classes)
 print(f"Number of classes in segmentation dataset: {num_seg_classes}")
-num_codes = len(CODES)
-if num_seg_classes != num_codes:
-    print(f"{num_codes} classes were specified in the settings file, however "
-          f"the data contains {num_seg_classes} classes. Exiting.")
-    sys.exit(1)
+print("These classes are:", *seg_classes, sep='\n')
 if num_seg_classes > 2:
     multilabel = True
-
     
 # Make sure label classes start from 0
 def fix_label_classes(seg_vol, seg_classes):
@@ -118,13 +127,35 @@ if seg_classes[0] != 0:
     print("Fixing label classes")
     seg_vol = fix_label_classes(seg_vol, seg_classes)
 
-# Output the normalised data slices
-print("Slicing data volume in 3 directions and outputting to disk")
+codes = [f"label_val{i}" for i in seg_classes]
+
+
+def clip_to_uint8(data, st_dev_factor):
+    data_st_dev = np.std(data)
+    data_mean = np.mean(data)
+    num_vox = np.prod(data.shape)
+    lower_bound = data_mean - (data_st_dev * st_dev_factor)
+    upper_bound = data_mean + (data_st_dev * st_dev_factor)
+    gt_ub = (data > upper_bound).sum()
+    lt_lb =(data < lower_bound).sum()
+    print(f"Lower bound: {lower_bound}, upper bound: {upper_bound}")
+    print(
+        f"Number of voxels above upper bound to be clipped {gt_ub} - percentage {gt_ub/num_vox * 100:.3f}%")
+    print(
+        f"Number of voxels below lower bound to be clipped {lt_lb} - percentage {lt_lb/num_vox * 100:.3f}%")
+    data = np.clip(data, lower_bound, upper_bound)
+    data = exposure.rescale_intensity(data, out_range='float')
+    return img_as_ubyte(data)
+
+# Output the data slices
+if NORMALISE:
+    print('Normalising the image data volume and downsampling to uint8.')
+    data_vol = clip_to_uint8(data_vol.compute(), ST_DEV_FACTOR)
+print("Slicing data volume in 3 directions and saving slices to disk.")
 os.makedirs(DATA_IM_OUT_DIR, exist_ok=True)
-output_slices_to_disk('all', data_vol, DATA_IM_OUT_DIR, 'data', None, None,
-                      normalize=NORMALIZE)
+output_slices_to_disk('all', data_vol, DATA_IM_OUT_DIR, 'data', None, None)
 # Output the seg slices
-print("Slicing segemented volume in 3 directions and outputting to disk")
+print("Slicing segmented volume in 3 directions and saving slices to disk.")
 os.makedirs(SEG_IM_OUT_DIR, exist_ok=True)
 output_slices_to_disk('all', seg_vol, SEG_IM_OUT_DIR, 'seg', None, None, label=True)
 
@@ -195,13 +226,13 @@ else:           bs=4
 print(f"using bs={bs}, have {free} MB of GPU RAM free")
 
 if multilabel:
-    print(f"Performing multilabel segmentation since there are "
+    print(f"Training for multilabel segmentation since there are "
           f"{num_seg_classes} classes")
     metrics = accuracy
     monitor = 'accuracy'
     loss_func = None
 else:
-    print(f"Performing binary segmentation since there are "
+    print(f"Training for binary segmentation since there are "
           f"{num_seg_classes} classes")
     metrics = [partial(dice, iou=True)]
     monitor = 'dice'
@@ -211,7 +242,7 @@ else:
 print("Creating training dataset from saved images.")
 src = (SegmentationItemList.from_folder(DATA_IM_OUT_DIR)
        .split_by_rand_pct()
-       .label_from_func(get_y_fn, classes=CODES))
+       .label_from_func(get_y_fn, classes=codes))
 data = (src.transform(get_transforms(), size=IMAGE_SIZE, tfm_y=True)
         .databunch(bs=bs)
         .normalize(imagenet_stats))
@@ -240,8 +271,8 @@ if NUM_CYC_UNFROZEN > 0:
     learn.fit_one_cycle(NUM_CYC_UNFROZEN, slice(lr_to_use/50, lr_to_use), pct_start=PCT_LR_INC)
 
 # Save the model
-model_out = OUT_ROOT_DIR/MODEL_OUTPUT_FN
-print(f"Exporting trained model to {model_out}")
+model_fn = f"{date.today()}_{MODEL_OUTPUT_FN}"
+model_out = Path(root_path, model_fn)
 learn.export(model_out)
 
 # Output a figure showing predictions from the validation dataset
@@ -278,8 +309,8 @@ for i in range(columns*rows)[::3]:
         col1.title.set_text('Data')
         col2.title.set_text('Ground Truth')
         col3.title.set_text('Prediction')
-plt.suptitle(f"Predictions for {MODEL_OUTPUT_FN}", fontsize=16)
-plt_out_pth = OUT_ROOT_DIR/f'{model_out.stem}_prediction_image.png' 
+plt.suptitle(f"Predictions for {model_fn}", fontsize=16)
+plt_out_pth = root_path/f'{model_out.stem}_prediction_image.png' 
 print(f"Saving example image predictions to {plt_out_pth}")  
 plt.savefig(plt_out_pth, dpi=300)
 
@@ -289,6 +320,8 @@ for fn in data_ims:
     os.remove(fn)
 
 seg_ims = glob.glob(f"{str(SEG_IM_OUT_DIR) + '/*.png'}")
-print(f"Deleting {len(seg_ims)} ground truth slices")
+print(f"Deleting {len(seg_ims)} segmentation slices")
 for fn in seg_ims:
     os.remove(fn)
+print(f"Deleting the empty segmentation image directory")
+os.rmdir(SEG_IM_OUT_DIR)
