@@ -1,17 +1,10 @@
 # 
-#   root_path - Root filepath for output directories, folder will be created
-#   data_vol_path - Path to the HDF5 volume to be segmented. Data should be in /data inside the file
-#   model_root_path - Path to the folder containing the model file
-#   model_file - Filename of the pickled 2d Unet model file. Needs to have been trained using BCE loss. For binary segmentation only
 #   consensus_vals - List of consensus cutoff values for agreement between volumes 
 #   e.g. if 10 is in the list a volume will be output thresholded on consensus between 10 volumes
 #   normalise - If set to True, the image data will be clipped and normalised before prediction. Set to False if data is already normalised.
+#   cuda_device - change this if you would like to run the prediction on a differnt GPU
 
-root_path: /dls/k11/data/2020/cm26457-3/processing/olly/gas_hydrates/200710_unet_segmentation/200714_2d_unet_hierachy/sandBrine_vs_methane/200714_12way_prediction
-data_vol_path: /dls/k11/data/2020/cm26457-3/processing/olly/gas_hydrates/200710_unet_segmentation/datafiles/89069_validation_384_data_uint16.h5 
-model_root_path: /dls/k11/data/2020/cm26457-3/processing/olly/gas_hydrates/200710_unet_segmentation/200714_2d_unet_hierachy/sandBrine_vs_methane
-model_file: 200714_centre_resnet34_sandBrine_vs_methane_Unet256.pkl
 consensus_vals:
   [7, 8, 9, 10, 11]
 normalise: True
-cuda_device: 1
+cuda_device: 0
