@@ -2,8 +2,9 @@
 data_im_dirname: data # Name of folder that sliced data 2D images will be output to
 seg_im_out_dirname: seg # Name of folder that sliced segmentation 2D images with be output to 
 model_output_fn: trainedUnet_model.pkl # Suffix for the saved U-net model filename
-# Settings for Unet training
 normalise: true # Normalise the image data before saving to disk
+st_dev_factor: 2.575 # The number of standard deviations from the mean to clip data to
+# Settings for Unet training
 image_size: 256 # size of images in databunch used for training
 weight_decay: 1e-2 # weight decay 
 pct_lr_inc: 0.3 # the percentage of overall iterations where the LR is increasing
