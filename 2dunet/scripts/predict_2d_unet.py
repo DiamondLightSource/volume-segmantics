@@ -124,11 +124,11 @@ def predict_orthog_slices_to_disk(learn, axis, data_arr, output_path):
         for val in tqdm(range(data_shape[0]), desc='Predicting z stack', bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}'):
             predict_single_slice(learn, 'z', val, data_arr[val, :, :], output_path)
     if axis in ['x', 'all']:
-        for val in tqdm(range(data_shape[1]), desc='Predicting x stack', bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}'):
-            predict_single_slice(learn, 'x', val, data_arr[:, val, :], output_path)                    
+        for val in tqdm(range(data_shape[1]), desc='Predicting y stack', bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}'):
+            predict_single_slice(learn, 'y', val, data_arr[:, val, :], output_path)                    
     if axis in ['y', 'all']:
-        for val in tqdm(range(data_shape[2]), desc='Predicting y stack', bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}'):
-            predict_single_slice(learn, 'y', val, data_arr[:, :, val], output_path)
+        for val in tqdm(range(data_shape[2]), desc='Predicting x stack', bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}'):
+            predict_single_slice(learn, 'x', val, data_arr[:, :, val], output_path)
     if axis not in ['x', 'y', 'z', 'all']:
         print("Axis should be one of: [all, x, y, or z]!")
 

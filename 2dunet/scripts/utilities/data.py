@@ -5,8 +5,9 @@ import glob
 import logging
 import os
 import sys
-from pathlib import Path
 import warnings
+from itertools import chain, product
+from pathlib import Path
 
 import dask.array as da
 import h5py as h5
@@ -49,35 +50,19 @@ class SettingsData:
                 logging.error(f"The file {v} does not appear to exist. Exiting!")
                 sys.exit(1)
 
-
-class DataSlicer:
-    """Class that converts 3d data volumes into 2d image slices on disk.
-    Slicing is carried in one or all of the xy (z), xz (y) and yz (x) planes.
+class DataSlicerBase:
+    """Base class for classes that convert 3d data volumes into 2d image slices on disk.
+    Slicing is carried in all of the xy (z), xz (y) and yz (x) planes.
 
     Args:
         settings (SettingsData): An initialised SettingsData object.
     """
 
     def __init__(self, settings):
-        self.multilabel = False
-        self.data_im_out_dir = None
-        self.seg_im_out_dir = None
-        self.data_vol = self.da_from_data(settings.data_vol_path)
-        self.seg_vol = self.da_from_data(settings.seg_vol_path)
         self.st_dev_factor = settings.st_dev_factor
+        self.data_vol = self.da_from_data(settings.data_vol_path)
         if settings.normalise:
             self.data_vol = self.clip_to_uint8(self.data_vol.compute())
-        seg_classes = np.unique(self.seg_vol.compute())
-        self.num_seg_classes = len(seg_classes)
-        if self.num_seg_classes > 2:
-            self.multilabel = True
-        logging.info("Number of classes in segmentation dataset:"
-                     f" {self.num_seg_classes}")
-        logging.info(f"These classes are: {seg_classes}")
-        if seg_classes[0] != 0:
-            logging.info("Fixing label classes.")
-            self.fix_label_classes(seg_classes)
-        self.codes = [f"label_val_{i}" for i in seg_classes]
 
     def da_from_data(self, path):
         """Returns a dask array when given a path to an HDF5 file.
@@ -120,6 +105,84 @@ class DataSlicer:
         data = np.clip(data, lower_bound, upper_bound)
         data = exposure.rescale_intensity(data, out_range='float')
         return img_as_ubyte(data)
+
+    def get_axis_index_pairs(self, vol_shape):
+        """Gets all combinations of axis and image slice index that are found
+        in a 3d volume.
+
+        Args:
+            vol_shape (tuple): 3d volume shape (z, y, x)
+
+        Returns:
+            itertools.chain: An iterable containing all combinations of axis
+            and image index that are found in the volume.
+        """
+        return chain(
+            product('z', range(vol_shape[0])),
+            product('y', range(vol_shape[1])),
+            product('x', range(vol_shape[2]))
+        )
+
+    def axis_index_to_slice(self, vol, axis, index):
+        """Converts an axis and image slice index for a 3d volume into a 2d 
+        data array (slice). 
+
+        Args:
+            vol (3d array): The data volume to be sliced.
+            axis (str): One of 'z', 'y' and 'x'.
+            index (int): An image slice index found in that axis. 
+
+        Returns:
+            2d array: A 2d image slice corresponding to the axis and index.
+        """
+        if axis == 'z':
+            return vol[index, :, :]
+        if axis == 'y':
+            return vol[:, index, :]
+        if axis == 'x':
+            return vol[:, :, index]
+
+    def get_num_of_ims(self, vol_shape):
+        """Calculates the total number of images that will be created when slicing
+        an image volume in the z, y and x planes.
+
+        Args:
+            vol_shape (tuple): 3d volume shape (z, y, x).
+
+        Returns:
+            int: Total number of images that will be created when the volume is
+            sliced. 
+        """
+        return sum(vol_shape)
+
+
+
+class TrainingDataSlicer(DataSlicerBase):
+    """Class that converts 3d data volumes into 2d image slices on disk for
+    model training.
+    Slicing is carried in all of the xy (z), xz (y) and yz (x) planes.
+
+    Args:
+        settings (SettingsData): An initialised SettingsData object.
+    """
+
+    def __init__(self, settings):
+        super().__init__(settings)
+        self.multilabel = False
+        self.data_im_out_dir = None
+        self.seg_im_out_dir = None
+        self.seg_vol = self.da_from_data(settings.seg_vol_path)
+        seg_classes = np.unique(self.seg_vol.compute())
+        self.num_seg_classes = len(seg_classes)
+        if self.num_seg_classes > 2:
+            self.multilabel = True
+        logging.info("Number of classes in segmentation dataset:"
+                     f" {self.num_seg_classes}")
+        logging.info(f"These classes are: {seg_classes}")
+        if seg_classes[0] != 0:
+            logging.info("Fixing label classes.")
+            self.fix_label_classes(seg_classes)
+        self.codes = [f"label_val_{i}" for i in seg_classes]
 
     def fix_label_classes(self, seg_classes):
         """Changes the data values of classes in a segmented volume so that
@@ -171,24 +234,12 @@ class DataSlicer:
             label (bool): Whether this is a label volume.
         """
         shape_tup = data_arr.shape
-        # There has to be a cleverer way to do this!
-        if axis in ['z', 'all']:
-            logging.info('Outputting z stack')
-            for val in tqdm(range(shape_tup[0])):
-                out_path = output_path/f"{name_prefix}_z_stack_{val}"
-                self.output_im(data_arr[val, :, :], out_path, label)
-        if axis in ['y', 'all']:
-            logging.info('Outputting y stack')
-            for val in tqdm(range(shape_tup[1])):
-                out_path = output_path/f"{name_prefix}_y_stack_{val}"
-                self.output_im(data_arr[:, val, :], out_path, label)
-        if axis in ['x', 'all']:
-            logging.info('Outputting x stack')
-            for val in tqdm(range(shape_tup[2])):
-                out_path = output_path/f"{name_prefix}_x_stack_{val}"
-                self.output_im(data_arr[:, :, val], out_path, label)
-        if axis not in ['x', 'y', 'z', 'all']:
-            logging.error("Axis should be one of: [all, x, y, or z]!")
+        ax_idx_pairs = self.get_axis_index_pairs(shape_tup)
+        num_ims = self.get_num_of_ims(shape_tup)
+        for axis, index in tqdm(ax_idx_pairs, total=num_ims):
+            out_path = output_path/f"{name_prefix}_{axis}_stack_{index}"
+            self.output_im(self.axis_index_to_slice(data_arr, axis, index),
+                           out_path, label)
 
     def output_im(self, data, path, label=False):
         """Converts a slice of data into an image on disk.

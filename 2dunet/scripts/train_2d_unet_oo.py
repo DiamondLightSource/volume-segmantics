@@ -5,7 +5,7 @@ import logging
 from datetime import date
 from pathlib import Path
 
-from utilities.data import DataSlicer, SettingsData
+from utilities.data import TrainingDataSlicer, SettingsData
 from utilities.unet2d import Unet2dTrainer
 
 
@@ -44,7 +44,7 @@ if __name__ == "__main__":
     # Set up the DataSlicer and slice the data volumes into image files
     data_im_out_dir = root_path/settings.data_im_dirname # dir for data imgs
     seg_im_out_dir = root_path/settings.seg_im_out_dirname # dir for seg imgs
-    slicer = DataSlicer(settings)
+    slicer = TrainingDataSlicer(settings)
     slicer.output_data_slices(data_im_out_dir, axis='all')
     slicer.output_label_slices(seg_im_out_dir, axis='all')
     # Set up the UnetTrainer
