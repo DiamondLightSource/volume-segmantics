@@ -7,4 +7,5 @@
 consensus_vals:
   [7, 8, 9, 10, 11]
 normalise: True
+st_dev_factor: 2.575
 cuda_device: 0

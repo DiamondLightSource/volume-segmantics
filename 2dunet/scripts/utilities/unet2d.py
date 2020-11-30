@@ -3,6 +3,7 @@
 """
 import logging
 import sys
+import os
 from functools import partial
 from pathlib import Path
 
@@ -16,6 +17,8 @@ from fastai.vision import (SegmentationItemList, dice, get_transforms,
 from matplotlib import pyplot as plt
 from skimage import exposure, img_as_ubyte, io
 from tqdm import tqdm
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
 
 
 class Unet2dTrainer:
@@ -125,6 +128,7 @@ class Unet2dTrainer:
         """
         logging.info(f"Saving the model weights to: {model_filepath}")
         self.model.save(model_filepath)
+        self.data.save(model_filepath.parent/f"{model_filepath.stem}_data.pkl")
 
     def output_prediction_figure(self, model_path):
         """Saves a figure containing image slice data for three random images
@@ -262,3 +266,62 @@ class Unet2dTrainer:
             pathlib.Path: Path to the corresponding segmentation label slice file. 
         """
         return self.label_dir/f'{"seg" + img_fname.stem[4:]}{img_fname.suffix}'
+
+
+class Unet2dPredictor:
+    """Class that can either load in fastai 2d Unet model weights or take an
+    instance of a trained fastai Unet learner. It can then predict 2d
+    segmentations of image slices provided and save them to disk.
+    """
+
+    def __init__(self, root_dir):
+        self.codes = ['Label_0', 'Label_255']
+        self.dummy_fns = ['data_z_stack_0.png', 'seg_z_stack_0.png']
+        self.dummy_dir = root_dir/'dummy_imgs'
+        self.root_dir = root_dir
+
+    def create_dummy_files(self):
+        logging.info(f"Creating dummy images in {self.dummy_dir}.")
+        os.makedirs(self.dummy_dir, exist_ok=True)
+        for fn in self.dummy_fns:
+            dummy_im = np.random.randint(256, size=(256, 256))
+            io.imsave(self.dummy_dir/fn, img_as_ubyte(dummy_im))
+
+    def create_dummy_dataset(self):
+        """Creates a fastai segmentation dataset and stores it as an instance
+        attribute.
+        """
+        logging.info("Creating training dataset from dummy images.")
+        src = (SegmentationItemList.from_folder(self.dummy_dir)
+                .split_by_rand_pct()
+               .label_from_func(self.get_label_name, classes=self.codes))
+        self.data = (src.transform(get_transforms(), size=256, tfm_y=True)
+                     .databunch()
+                     .normalize(imagenet_stats))
+
+    def get_label_name(self, img_fname):
+        """Converts a path fo an image slice to a path for corresponding label
+        slice.
+
+        Args:
+            img_fname (pathlib.Path): Path to an image slice file.
+
+        Returns:
+            pathlib.Path: Path to the corresponding segmentation label slice file. 
+        """
+        return self.dummy_dir/f'{"seg" + img_fname.stem[4:]}{img_fname.suffix}'
+
+    def create_model(self, weights_fn):
+        """Creates a deep learning model linked to the dataset and stores it as
+        an instance attribute.
+        """
+        self.create_dummy_files()
+        self.create_dummy_dataset()
+        logging.info("Creating 2d U-net model for prediction.")
+        self.model = unet_learner(
+            self.data, models.resnet34, model_dir=weights_fn.resolve().parent)
+        logging.info("Loading in the saved weights.")
+        self.model.load(weights_fn.stem)
+        # Remove the restriction on the model prediction size
+        self.model.data.single_ds.tfmargs['size'] = None
+
