@@ -1,11 +1,14 @@
 # -*- coding: utf-8 -*-
 """Classes for 2d U-net training and prediction.
 """
+import json
 import logging
-import sys
 import os
+import sys
+import warnings
 from functools import partial
 from pathlib import Path
+from zipfile import ZipFile
 
 import numpy as np
 import torch.nn.functional as F
@@ -17,7 +20,7 @@ from fastai.vision import (SegmentationItemList, dice, get_transforms,
 from matplotlib import pyplot as plt
 from skimage import exposure, img_as_ubyte, io
 from tqdm import tqdm
-import warnings
+
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
@@ -126,9 +129,19 @@ class Unet2dTrainer:
             model_filepath (pathlib.Path): Full path to location to save model
             weights excluding file extension.
         """
-        logging.info(f"Saving the model weights to: {model_filepath}")
         self.model.save(model_filepath)
-        self.data.save(model_filepath.parent/f"{model_filepath.stem}_data.pkl")
+        json_path = model_filepath.parent/f"{model_filepath.name}_codes.json"
+        zip_path = model_filepath.with_suffix('.zip')
+        logging.info(
+            f"Zipping the model weights to: {zip_path}")
+        with open(json_path, 'w') as jf:
+            json.dump(self.codes, jf)
+        with ZipFile(zip_path, mode='w') as zf:
+            zf.write(json_path, arcname=json_path.name)
+            zf.write(model_filepath.with_suffix('.pth'),
+                     arcname=model_filepath.with_suffix('.pth').name)
+        os.remove(json_path)
+        os.remove(model_filepath.with_suffix('.pth'))
 
     def output_prediction_figure(self, model_path):
         """Saves a figure containing image slice data for three random images
@@ -274,8 +287,7 @@ class Unet2dPredictor:
     segmentations of image slices provided and save them to disk.
     """
 
-    def __init__(self, root_dir):
-        self.codes = ['Label_0', 'Label_255']
+    def __init__(self, root_dir, model_path=None):
         self.dummy_fns = ['data_z_stack_0.png', 'seg_z_stack_0.png']
         self.dummy_dir = root_dir/'dummy_imgs'
         self.root_dir = root_dir
@@ -311,17 +323,27 @@ class Unet2dPredictor:
         """
         return self.dummy_dir/f'{"seg" + img_fname.stem[4:]}{img_fname.suffix}'
 
-    def create_model(self, weights_fn):
+    def create_model_from_zip(self, weights_fn):
         """Creates a deep learning model linked to the dataset and stores it as
         an instance attribute.
         """
+        weights_fn = weights_fn.resolve()
+        logging.info(f"Unzipping the model weights and label classes from {weights_fn}")
+        output_dir = "extracted_model_files"
+        os.makedirs(output_dir, exist_ok=True)
+        with ZipFile(weights_fn, mode='r') as zf:
+            zf.extractall(output_dir)
+        out_path = self.root_dir/output_dir
+        # Load in the label classes from the json file
+        with open(out_path/f"{weights_fn.stem}_codes.json") as jf:
+            self.codes = json.load(jf)
+        # Have to create dummy files and datset before loading in model weights 
         self.create_dummy_files()
         self.create_dummy_dataset()
         logging.info("Creating 2d U-net model for prediction.")
         self.model = unet_learner(
-            self.data, models.resnet34, model_dir=weights_fn.resolve().parent)
+            self.data, models.resnet34, model_dir=out_path)
         logging.info("Loading in the saved weights.")
         self.model.load(weights_fn.stem)
         # Remove the restriction on the model prediction size
         self.model.data.single_ds.tfmargs['size'] = None
-

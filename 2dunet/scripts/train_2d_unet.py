@@ -1,21 +1,21 @@
 import argparse
+import glob
 import os
 import sys
 import warnings
-import yaml
-import glob
 from datetime import date
-from tqdm import tqdm
 
 import dask.array as da
 import h5py as h5
 import numpy as np
 import torch.nn.functional as F
+import yaml
 from fastai.callbacks import *
 from fastai.utils.mem import *
 from fastai.vision import *
 from skimage import exposure, img_as_float, img_as_ubyte, io
 from skimage.transform import resize
+from tqdm import tqdm
 
 warnings.filterwarnings("ignore", category=UserWarning)
 

@@ -11,16 +11,21 @@
 
 import argparse
 import os
-from datetime import date
 import re
-import yaml
-from tqdm import tqdm
-import numpy as np
+import sys
+import warnings
+from datetime import date
+from pathlib import Path
+
 import dask.array as da
 import h5py as h5
-from pathlib import Path
-from skimage import exposure, img_as_ubyte
-import warnings
+import numpy as np
+import yaml
+from fastai.utils.mem import *
+from fastai.vision import *
+from skimage import exposure, img_as_float, img_as_ubyte, io
+from tqdm import tqdm
+
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
@@ -68,9 +73,6 @@ ST_DEV_FACTOR = 2.575  # 99% of values lie within 2.575 stdevs of the mean
 
 print(f"Setting device {CUDA_DEVICE}")
 os.environ['CUDA_VISIBLE_DEVICES'] = CUDA_DEVICE
-from fastai.vision import *
-from fastai.utils.mem import *
-from skimage import img_as_ubyte, io, exposure, img_as_float
 ######## Utility functions ############
 makedirs = partial(os.makedirs, exist_ok=True)
 def da_from_data(path):    

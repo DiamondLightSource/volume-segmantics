@@ -284,14 +284,17 @@ class TrainingDataSlicer(DataSlicerBase):
         self.delete_label_im_slices()
 
 
-class PredictionDataSlicerCombiner(DataSlicerBase):
+class PredictionDataSlicer(DataSlicerBase):
     """Class that converts 3d data volumes into 2d image slices for
     segmentation prediction and that combines the slices back into volumes after
     prediction. 
 
     1. Slicing is carried in the xy (z), xz (y) and yz (x) planes. 2. The data
     volume is rotated by 90 degrees. Steps 1 and 2 are then repeated untill
-    4 rotations have been sliced. 
+    4 rotations have been sliced.
+
+    The class also has methods to combine the image slices in to 3d volumes and
+    also to combine these volumes and perform consensus thresholding.
 
     Args:
         settings (SettingsData): An initialised SettingsData object.
@@ -374,7 +377,6 @@ class PredictionDataSlicerCombiner(DataSlicerBase):
         return combined_out_path
 
     def predict_single_slice(self, axis, index, data, output_path):
-        #data = data.compute()
         data = img_as_float(data)
         img = Image(pil2tensor(data, dtype=np.float32))
         self.fix_odd_sides(img)
@@ -397,7 +399,8 @@ class PredictionDataSlicerCombiner(DataSlicerBase):
                                     padding_mode='reflection')
 
     def predict_orthog_slices_to_disk(self, data_arr, output_path):
-        """Outputs slices from data or ground truth seg volumes sliced in any or all three of the orthogonal planes"""
+        """Outputs slices from data or ground truth seg volumes sliced in
+         all three of the orthogonal planes"""
         shape_tup = data_arr.shape
         ax_idx_pairs = self.get_axis_index_pairs(shape_tup)
         num_ims = self.get_num_of_ims(shape_tup)
@@ -415,9 +418,10 @@ class PredictionDataSlicerCombiner(DataSlicerBase):
             logging.info(f'Writing to {combined_out}')
             combined.to_hdf5(combined_out, '/data')
 
-    def predict_12_ways(self):
+    def predict_12_ways(self, root_path):
+        self.setup_folder_stucture(root_path)
         combined_vol_paths = []
-        for k in tqdm(range(4), ncols=100, desc='Total progress'):
+        for k in tqdm(range(4), ncols=100, desc='Total progress', postfix="\n"):
             key, output_path = self.dir_list[k]
             logging.info(f'Rotating volume {k * 90} degrees')
             rotated = np.rot90(self.data_vol, k)
