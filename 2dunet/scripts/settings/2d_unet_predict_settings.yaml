@@ -1,11 +1,14 @@
-# 
 #   consensus_vals - List of consensus cutoff values for agreement between volumes 
 #   e.g. if 10 is in the list a volume will be output thresholded on consensus between 10 volumes
 #   normalise - If set to True, the image data will be clipped and normalised before prediction. Set to False if data is already normalised.
-#   cuda_device - change this if you would like to run the prediction on a differnt GPU
-
+#   st_dev_factor - Number of standard deviations from the mean to clip data to.
+#   hdf5_path - Internal path in the HDF5 file where the image data is stored.
+#   del_vols - Whether to clean up the 16 intermediate predicted volumes to save disk space.
+#   cuda_device - change this if you would like to run the prediction on a different GPU
 consensus_vals:
-  [7, 8, 9, 10, 11]
+  [8, 9]
 normalise: True
 st_dev_factor: 2.575
+data_hdf5_path: /data
+del_vols: True
 cuda_device: 0

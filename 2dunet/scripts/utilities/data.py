@@ -63,23 +63,25 @@ class DataSlicerBase:
 
     def __init__(self, settings):
         self.st_dev_factor = settings.st_dev_factor
-        self.data_vol = self.da_from_data(settings.data_vol_path)
+        self.data_vol = self.da_from_data(settings.data_vol_path,
+                                          hdf5_path=settings.data_hdf5_path)
         if settings.normalise:
             self.data_vol = self.clip_to_uint8(self.data_vol.compute())
 
-    def da_from_data(self, path):
+    def da_from_data(self, path, hdf5_path='/data'):
         """Returns a dask array when given a path to an HDF5 file.
 
         The data is assumed to be found in '/data' in the file.
 
         Args:
             path(pathlib.Path): The path to the HDF5 file.
+            hdf5_path (str): The internal HDF5 path to the data.
 
         Returns:
             dask.array: A dask array object for the data stored in the HDF5 file.
         """
         f = h5.File(path, 'r')
-        d = f['/data']
+        d = f[hdf5_path]
         return da.from_array(d, chunks='auto')
 
     def clip_to_uint8(self, data):
@@ -174,7 +176,8 @@ class TrainingDataSlicer(DataSlicerBase):
         self.multilabel = False
         self.data_im_out_dir = None
         self.seg_im_out_dir = None
-        self.seg_vol = self.da_from_data(settings.seg_vol_path)
+        self.seg_vol = self.da_from_data(settings.seg_vol_path,
+                                         hdf5_path=settings.seg_hdf5_path)
         seg_classes = np.unique(self.seg_vol.compute())
         self.num_seg_classes = len(seg_classes)
         if self.num_seg_classes > 2:
@@ -306,6 +309,7 @@ class PredictionDataSlicer(DataSlicerBase):
         super().__init__(settings)
         self.consensus_vals = map(int, settings.consensus_vals)
         self.predictor = predictor
+        self.delete_vols = settings.del_vols # Whether to clean up predicted vols
 
     def setup_folder_stucture(self, root_path):
         """Sets up a folder structure to store the predicted images.
@@ -401,11 +405,15 @@ class PredictionDataSlicer(DataSlicerBase):
         if final:
             combined_out_path = output_path_list[0].parent / \
                 f'{date.today()}_{prefix}_12_volumes_combined.h5'
-        logging.info(f'Outputting the {num_vols} combined volumes to {combined_out_path}')
+        logging.info(f'Saving the {num_vols} combined volumes to {combined_out_path}')
         combined = combined.compute()
         combined = np.rot90(combined, 0 - k)
         with h5.File(combined_out_path, 'w') as f:
             f['/data'] = combined
+        if self.delete_vols:
+            logging.info("Deleting the source volumes for the combined volume")
+            for vol_filepath in output_path_list:
+                os.remove(vol_filepath)
         return combined_out_path
 
     def predict_single_slice(self, axis, index, data, output_path):
@@ -501,3 +509,6 @@ class PredictionDataSlicer(DataSlicerBase):
         # Combine all the volumes
         final_combined = self.combine_vols(combined_vol_paths, 0, 'final', True)
         self.consensus_threshold(final_combined)
+        if self.delete_vols:
+            for _, vol_dir in self.dir_list:
+                os.rmdir(vol_dir)
