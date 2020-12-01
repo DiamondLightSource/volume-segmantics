@@ -4,20 +4,20 @@
 import glob
 import logging
 import os
+import re
 import sys
 import warnings
+from datetime import date
 from itertools import chain, product
 from pathlib import Path
-from datetime import date
-import re
 
 import dask.array as da
 import h5py as h5
 import numpy as np
 import yaml
-from skimage import exposure, img_as_ubyte, img_as_float, io
+from fastai.vision import Image, crop_pad, pil2tensor
+from skimage import exposure, img_as_float, img_as_ubyte, io
 from tqdm import tqdm
-from fastai.vision import pil2tensor, crop_pad, Image
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -298,6 +298,8 @@ class PredictionDataSlicer(DataSlicerBase):
 
     Args:
         settings (SettingsData): An initialised SettingsData object.
+        predictor (Unet2dPredictor): A Unet2dPredictor object with a trained
+        2d U-net as an attribute.
     """
 
     def __init__(self, settings, predictor):
@@ -306,6 +308,11 @@ class PredictionDataSlicer(DataSlicerBase):
         self.predictor = predictor
 
     def setup_folder_stucture(self, root_path):
+        """Sets up a folder structure to store the predicted images.
+    
+        Args:
+            root_path (Path): The top level directory for data output.
+        """
         vol_dir= root_path/f'{date.today()}_predicted_volumes'
         non_rotated = vol_dir/f'{date.today()}_non_rotated_volumes'
         rot_90_seg = vol_dir/f'{date.today()}_rot_90_volumes'
@@ -322,6 +329,17 @@ class PredictionDataSlicer(DataSlicerBase):
             os.makedirs(dir_path, exist_ok=True)
 
     def combine_slices_to_vol(self, folder_path):
+        """Combines the orthogonally sliced png images in a folder to HDF5 
+        volumes. One volume for each direction. These are then saved with a
+        common orientation. The images slices are then deleted.
+
+        Args:
+            folder_path (pathlib.Path): Path to a folder containing images that
+            were sliced in the three orthogonal planes. 
+
+        Returns:
+            list of pathlib.Path: Paths to the created volumes.
+        """
         output_path_list = []
         file_list = folder_path.ls()
         axis_list = ['z', 'y', 'x']
@@ -360,6 +378,20 @@ class PredictionDataSlicer(DataSlicerBase):
         return output_path_list
 
     def combine_vols(self, output_path_list, k, prefix, final=False):
+        """Sums volumes to give a combination of binary segmentations and saves to disk.
+
+        Args:
+            output_path_list (list of pathlib.Path): Paths to the volumes to be combined.
+            k (int): Number of 90 degree rotations that these image volumes
+            have been transformed by before slicing. 
+            prefix (str): A filename prefix to give the final volume.
+            final (bool, optional): Set to True if this is the final combination
+            of the volumes that were created from each of the 90 degree rotations.
+            Defaults to False.
+
+        Returns:
+            pathlib.Path: A file path to the combined HDF5 volume that was saved.
+        """
         num_vols = len(output_path_list)
         combined = self.da_from_data(output_path_list[0])
         for subsequent in output_path_list[1:]:
@@ -377,6 +409,16 @@ class PredictionDataSlicer(DataSlicerBase):
         return combined_out_path
 
     def predict_single_slice(self, axis, index, data, output_path):
+        """Takes in a 2d data array and saves the predicted U-net segmentation to disk.
+
+        Args:
+            axis (str): The name of the axis to incorporate in the output filename.
+            index (int): The slice number to incorporate in the output filename.
+            data (numpy.array): The 2d data array to be fed into the U-net.
+            output_path (pathlib.Path): The path to directory for file output.
+        """
+        if isinstance(data, da.core.Array):
+            data = data.compute()
         data = img_as_float(data)
         img = Image(pil2tensor(data, dtype=np.float32))
         self.fix_odd_sides(img)
@@ -386,6 +428,13 @@ class PredictionDataSlicer(DataSlicerBase):
             output_path/f"unet_prediction_{axis}_stack_{index}.png", pred_slice)
 
     def fix_odd_sides(self, example_image):
+        """Replaces an an odd image dimension with an even dimension by padding.
+    
+        Taken from https://forums.fast.ai/t/segmentation-mask-prediction-on-different-input-image-sizes/44389/7.
+
+        Args:
+            example_image (fastai.vision.Image): The image to be fixed.
+        """
         if (list(example_image.size)[0] % 2) != 0:
             example_image = crop_pad(example_image,
                                     size=(list(example_image.size)[
@@ -400,7 +449,12 @@ class PredictionDataSlicer(DataSlicerBase):
 
     def predict_orthog_slices_to_disk(self, data_arr, output_path):
         """Outputs slices from data or ground truth seg volumes sliced in
-         all three of the orthogonal planes"""
+         all three of the orthogonal planes
+         
+        Args:
+        data_array (numpy.array): The 3d data volume to be sliced and predicted.
+        output_path (pathlib.Path): A Path to the output directory.
+         """
         shape_tup = data_arr.shape
         ax_idx_pairs = self.get_axis_index_pairs(shape_tup)
         num_ims = self.get_num_of_ims(shape_tup)
@@ -409,6 +463,12 @@ class PredictionDataSlicer(DataSlicerBase):
                 axis, index, self.axis_index_to_slice(data_arr, axis, index), output_path)
 
     def consensus_threshold(self, input_path):
+        """Saves a consensus thresholded volume from combination of binary volumes.
+
+        Args:
+            input_path (pathlib.Path): Path to the combined HDF5 volume that is
+             to be thresholded.
+        """
         for val in self.consensus_vals:
             combined = self.da_from_data(input_path)
             combined_out = input_path.parent / \
@@ -419,6 +479,14 @@ class PredictionDataSlicer(DataSlicerBase):
             combined.to_hdf5(combined_out, '/data')
 
     def predict_12_ways(self, root_path):
+        """Runs the loop that coordinates the prediction of a 3d data volume
+        by a 2d U-net in 12 orientations and then combination of the segmented
+        binary outputs.
+
+        Args:
+            root_path (pathlib.Path): Path to the top level directory for data
+            output.
+        """
         self.setup_folder_stucture(root_path)
         combined_vol_paths = []
         for k in tqdm(range(4), ncols=100, desc='Total progress', postfix="\n"):
