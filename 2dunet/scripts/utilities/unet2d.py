@@ -347,3 +347,6 @@ class Unet2dPredictor:
         self.model.load(weights_fn.stem)
         # Remove the restriction on the model prediction size
         self.model.data.single_ds.tfmargs['size'] = None
+
+    def get_model_from_trainer(self, trainer):
+        self.model = trainer.model
