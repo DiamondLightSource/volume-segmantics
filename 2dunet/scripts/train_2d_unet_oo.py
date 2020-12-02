@@ -7,7 +7,7 @@ from pathlib import Path
 
 from utilities.data import TrainingDataSlicer, SettingsData
 from utilities.unet2d import Unet2dTrainer
-
+from utilities.cmdline import CheckExt
 
 
 def init_argparse() -> argparse.ArgumentParser:
@@ -27,8 +27,10 @@ def init_argparse() -> argparse.ArgumentParser:
         version=f"{parser.prog} version 1.0.0"
     )
     parser.add_argument('data_vol_path', metavar='Image data file path', type=str,
+                        action=CheckExt({'h5', 'hdf5'}),
                         help='the path to an HDF5 file containing the imaging data volume.')
     parser.add_argument('seg_vol_path', metavar='Segmentation file path', type=str,
+                        action=CheckExt({'h5', 'hdf5'}),
                         help='the path to an HDF5 file containing a segmented volume.')
     return parser
 
