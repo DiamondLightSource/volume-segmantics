@@ -19,6 +19,8 @@ from fastai.vision import Image, crop_pad, pil2tensor
 from skimage import exposure, img_as_float, img_as_ubyte, io
 from tqdm import tqdm
 
+from . import config as cfg
+
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
@@ -63,8 +65,6 @@ class DataSlicerBase:
 
     def __init__(self, settings):
         self.st_dev_factor = settings.st_dev_factor
-        self.data_vol = self.da_from_data(settings.data_vol_path,
-                                          hdf5_path=settings.data_hdf5_path)
         if settings.normalise:
             self.data_vol = self.clip_to_uint8(self.data_vol.compute())
 
@@ -172,11 +172,15 @@ class TrainingDataSlicer(DataSlicerBase):
     """
 
     def __init__(self, settings):
+        data_vol_path = getattr(settings, cfg.TRAIN_DATA_ARG)
+        self.data_vol = self.da_from_data(data_vol_path,
+                                          hdf5_path=settings.train_data_hdf5_path)
         super().__init__(settings)
         self.multilabel = False
         self.data_im_out_dir = None
         self.seg_im_out_dir = None
-        self.seg_vol = self.da_from_data(settings.seg_vol_path,
+        seg_vol_path = getattr(settings, cfg.LABEL_DATA_ARG)
+        self.seg_vol = self.da_from_data(seg_vol_path,
                                          hdf5_path=settings.seg_hdf5_path)
         seg_classes = np.unique(self.seg_vol.compute())
         self.num_seg_classes = len(seg_classes)
@@ -306,6 +310,9 @@ class PredictionDataSlicer(DataSlicerBase):
     """
 
     def __init__(self, settings, predictor):
+        data_vol_path = getattr(settings, cfg.PREDICT_DATA_ARG)
+        self.data_vol = self.da_from_data(data_vol_path,
+                                          hdf5_path=settings.predict_data_hdf5_path)
         super().__init__(settings)
         self.consensus_vals = map(int, settings.consensus_vals)
         self.predictor = predictor

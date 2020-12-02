@@ -5,9 +5,10 @@ import logging
 from datetime import date
 from pathlib import Path
 
-from utilities.data import TrainingDataSlicer, SettingsData
-from utilities.unet2d import Unet2dTrainer
+from utilities import config as cfg
 from utilities.cmdline import CheckExt
+from utilities.data import SettingsData, TrainingDataSlicer
+from utilities.unet2d import Unet2dTrainer
 
 
 def init_argparse() -> argparse.ArgumentParser:
@@ -20,29 +21,29 @@ def init_argparse() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         usage="%(prog)s [path/to/data/file.h5] [path/to/segmentation/file.h5]",
         description="Train a 2d U-net model on the 3d data and corresponding"
-        "segmentation provided in the files."
+        " segmentation provided in the files."
     )
     parser.add_argument(
         "-v", "--version", action="version",
         version=f"{parser.prog} version 1.0.0"
     )
-    parser.add_argument('data_vol_path', metavar='Image data file path', type=str,
-                        action=CheckExt({'h5', 'hdf5'}),
-                        help='the path to an HDF5 file containing the imaging data volume.')
-    parser.add_argument('seg_vol_path', metavar='Segmentation file path', type=str,
-                        action=CheckExt({'h5', 'hdf5'}),
-                        help='the path to an HDF5 file containing a segmented volume.')
+    parser.add_argument(cfg.TRAIN_DATA_ARG, metavar='Path to training image data volume', type=str,
+                        action=CheckExt(cfg.TRAIN_DATA_EXT),
+                        help='the path to an HDF5 file containing the imaging data volume for training')
+    parser.add_argument(cfg.LABEL_DATA_ARG, metavar='Path to label volume', type=str,
+                        action=CheckExt(cfg.LABEL_DATA_EXT),
+                        help='the path to an HDF5 file containing a segmented volume for training')
     return parser
 
 if __name__ == "__main__":
     logging.basicConfig(
-        level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s',
-        datefmt='%d-%b-%y %H:%M:%S')
+        level=logging.INFO, format=cfg.LOGGING_FMT,
+        datefmt=cfg.LOGGING_DATE_FMT)
     root_path = Path.cwd()  # For module load script, use the CWD
     # Set up the settings
     parser = init_argparse()
     args = parser.parse_args()
-    settings_path = Path(root_path, 'unet-settings', '2d_unet_train_settings.yaml')
+    settings_path = Path(root_path, cfg.SETTINGS_DIR, cfg.TRAIN_SETTINGS_FN)
     settings = SettingsData(settings_path, args)
     # Set up the DataSlicer and slice the data volumes into image files
     data_im_out_dir = root_path/settings.data_im_dirname # dir for data imgs

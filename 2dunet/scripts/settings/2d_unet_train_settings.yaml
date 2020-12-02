@@ -4,7 +4,7 @@ seg_im_out_dirname: seg # Name of folder that sliced segmentation 2D images with
 model_output_fn: trained2dUnet_model # Suffix for the saved U-net model filename
 normalise: true # Normalise the image data before saving to disk
 st_dev_factor: 2.575 # The number of standard deviations from the mean to clip data to
-data_hdf5_path: /data # The internal HDF5 path to the image data
+train_data_hdf5_path: /data # The internal HDF5 path to the image data
 seg_hdf5_path: /data # The internal HDF5 path to the label data
 
 # Settings for Unet training
