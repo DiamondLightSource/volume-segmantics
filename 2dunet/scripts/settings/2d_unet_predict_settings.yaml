@@ -1,16 +1,8 @@
-# 
-#   root_path - Root filepath for output directories, folder will be created
-#   data_vol_path - Path to the HDF5 volume to be segmented. Data should be in /data inside the file
-#   model_root_path - Path to the folder containing the model file
-#   model_file - Filename of the pickled 2d Unet model file. Needs to have been trained using BCE loss. For binary segmentation only
-#   consensus_vals - List of consensus cutoff values for agreement between volumes 
-#   e.g. if 10 is in the list a volume will be output thresholded on consensus between 10 volumes
-#   normalise - If set to True, the image data will be clipped and normalised before prediction. Set to False if data is already normalised.
-
-root_path: /dls/p45/data/2019/cm22981-2/processing/segmentation/win_data/200513_script_test/predict_12_ways
-data_vol_path: /dls/science/groups/das/SuRVoS/placenta_dataset/data3/vessel_data/not_down_sample/data_unbinned.h5 
-model_root_path: /dls/p45/data/2019/cm22981-2/processing/segmentation/win_data/200513_script_test
-model_file: 200513_vol3_vessels_trainedUnet256.pkl 
-consensus_vals:
-  [8, 9]
-normalise: True
+# Settings for predictiopn of a 3d volume using a 2d U-net
+consensus_vals: # List of consensus cutoff values for agreement between volumes. One volume is saved per value.
+  [8, 9]        # e.g. if 10 is in the list a volume will be thresholded on consensus between 10 volumes and saved.
+normalise: True # If set to True, the image data will be clipped and normalised before prediction. Set to False if data is already normalised.
+st_dev_factor: 2.575 # Number of standard deviations from the mean to clip data to.
+predict_data_hdf5_path: /data # Internal path in the HDF5 file where the image data for prediction is stored.
+del_vols: True # Whether to clean up the 16 intermediate predicted volumes to save disk space.
+cuda_device: 0 # Change this if you would like to run the prediction on a different GPU

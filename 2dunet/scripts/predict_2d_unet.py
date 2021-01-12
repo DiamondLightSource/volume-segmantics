@@ -9,25 +9,29 @@
 
 """
 
+import argparse
 import os
-from datetime import date
 import re
-import yaml
-from tqdm import tqdm
-import numpy as np
+import sys
+import warnings
+from datetime import date
+from pathlib import Path
+
 import dask.array as da
 import h5py as h5
-from fastai.vision import *
+import numpy as np
+import yaml
 from fastai.utils.mem import *
-from skimage import img_as_ubyte, io, exposure, img_as_float
-from skimage.transform import resize
-import warnings
+from fastai.vision import *
+from skimage import exposure, img_as_float, img_as_ubyte, io
+from tqdm import tqdm
+
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
-real_path = os.path.realpath(__file__ ) 
-dir_path = os.path.dirname(real_path) # Extract the directory of the script
-settings_path = Path(dir_path,'settings','2d_unet_predict_settings.yaml')
+dir_path = Path.cwd()  # For module load script, use the CWD
+settings_path = Path(dir_path, 'unet-settings',
+                     '2d_unet_predict_settings.yaml')
 print(f"Loading settings from {settings_path}")
 if settings_path.exists():
     with open(settings_path, 'r') as stream:
@@ -37,25 +41,38 @@ else:
     sys.exit(1)
 
 
-"""
-    ROOT_PATH - Root filepath for output directories, folder will be created
-    DATA_VOL_PATH - Path to the HDF5 volume to be segmented. Data should be in /data inside the file
-    LEARNER_ROOT_PATH - Path to the folder containing the model file
-    LEARNER_FILE - Filename of the pickled 2d Unet model file. Needs to have been trained using BCE loss. For binary segmentation only
-    CONSENSUS_VALS - List of consensus cutoff values for agreement between volumes
-    e.g. if 10 is in the list a volume will be output thresholded on consensus between 10 volumes
+def init_argparse() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        usage="%(prog)s [path/to/model/file.pkl] [path/to/data/file.h5]",
+        description="Predict segmentation of a 3d data volume using the 2d"
+        "model provided."
+    )
+    parser.add_argument(
+        "-v", "--version", action="version",
+        version=f"{parser.prog} version 1.0.0"
+    )
+    parser.add_argument('model_path', metavar='Model file path', type=str,
+                        help='the path to a pickle file containing the model.')
+    parser.add_argument('data_vol_path', metavar='Data volume file path', type=str,
+                        help='the path to an HDF5 file containing the data to segment.')
+    return parser
 
-"""
 
+parser = init_argparse()
+args = parser.parse_args()
+data_vol_path = Path(args.data_vol_path)
+model_path = Path(args.model_path)
+if not model_path.is_file() or not data_vol_path.is_file():
+    print(f"One or more of the given paths does not appear to specify a file. Exiting!")
+    sys.exit(1)
 
-ROOT_PATH = Path(settings_dict['root_path'])
-DATA_VOL_PATH = Path(settings_dict['data_vol_path'])
-LEARNER_ROOT_PATH = Path(settings_dict['model_root_path'])
-LEARNER_FILE = settings_dict['model_file']
 CONSENSUS_VALS = map(int, settings_dict['consensus_vals'])
 NORMALISE = settings_dict['normalise']
+CUDA_DEVICE = str(settings_dict['cuda_device'])
+ST_DEV_FACTOR = 2.575  # 99% of values lie within 2.575 stdevs of the mean
 
-
+print(f"Setting device {CUDA_DEVICE}")
+os.environ['CUDA_VISIBLE_DEVICES'] = CUDA_DEVICE
 ######## Utility functions ############
 makedirs = partial(os.makedirs, exist_ok=True)
 def da_from_data(path):    
@@ -75,13 +92,26 @@ def fix_odd_sides(example_image):
                             size=(list(example_image.size)[0], list(example_image.size)[1] + 1),
                             padding_mode = 'reflection')
 
-def predict_single_slice(learn, axis, val, data, output_path, normalise=False):
+def clip_to_uint8(data, st_dev_factor):
+    data_st_dev = np.std(data)
+    data_mean = np.mean(data)
+    num_vox = np.prod(data.shape)
+    lower_bound = data_mean - (data_st_dev * st_dev_factor)
+    upper_bound = data_mean + (data_st_dev * st_dev_factor)
+    gt_ub = (data > upper_bound).sum()
+    lt_lb = (data < lower_bound).sum()
+    print(f"Lower bound: {lower_bound}, upper bound: {upper_bound}")
+    print(
+        f"Number of voxels above upper bound to be clipped {gt_ub} - percentage {gt_ub/num_vox * 100:.3f}%")
+    print(
+        f"Number of voxels below lower bound to be clipped {lt_lb} - percentage {lt_lb/num_vox * 100:.3f}%")
+    data = np.clip(data, lower_bound, upper_bound)
+    data = exposure.rescale_intensity(data, out_range='float')
+    return img_as_ubyte(data)
+
+def predict_single_slice(learn, axis, val, data, output_path):
     #data = data.compute()
     data = img_as_float(data)
-    if normalise:
-        data_st_dev = np.std(data)
-        data = np.clip(data, None, data_st_dev * 3) # 99.7% of values withing 3 stdevs
-        data = exposure.rescale_intensity(data, out_range='float')
     img = Image(pil2tensor(data, dtype=np.float32))
     fix_odd_sides(img)
     prediction = learn.predict(img)
@@ -94,13 +124,13 @@ def predict_orthog_slices_to_disk(learn, axis, data_arr, output_path):
     # There has to be a cleverer way to do this!
     if axis in ['z', 'all']:
         for val in tqdm(range(data_shape[0]), desc='Predicting z stack', bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}'):
-            predict_single_slice(learn, 'z', val, data_arr[val, :, :], output_path, NORMALISE)
+            predict_single_slice(learn, 'z', val, data_arr[val, :, :], output_path)
     if axis in ['x', 'all']:
-        for val in tqdm(range(data_shape[1]), desc='Predicting x stack', bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}'):
-            predict_single_slice(learn, 'x', val, data_arr[:, val, :], output_path, NORMALISE)                    
+        for val in tqdm(range(data_shape[1]), desc='Predicting y stack', bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}'):
+            predict_single_slice(learn, 'y', val, data_arr[:, val, :], output_path)                    
     if axis in ['y', 'all']:
-        for val in tqdm(range(data_shape[2]), desc='Predicting y stack', bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}'):
-            predict_single_slice(learn, 'y', val, data_arr[:, :, val], output_path, NORMALISE)
+        for val in tqdm(range(data_shape[2]), desc='Predicting x stack', bar_format='{l_bar}{bar:20}{r_bar}{bar:-20b}'):
+            predict_single_slice(learn, 'x', val, data_arr[:, :, val], output_path)
     if axis not in ['x', 'y', 'z', 'all']:
         print("Axis should be one of: [all, x, y, or z]!")
 
@@ -194,19 +224,24 @@ def threshold(input_path, range_list):
 
 
 ######## Do stuff here #########
-
-# Make a root directory for the ouitput
-makedirs(ROOT_PATH)
+root_path = dir_path/f"{date.today()}_predicted_data"
+print(f'Creating a directory for the output data {root_path}')
+makedirs(root_path)
 # Load the data volume and the model
-data_arr = da_from_data(DATA_VOL_PATH)
-learn = load_learner(LEARNER_ROOT_PATH, LEARNER_FILE)
+print(f'Loading the image data from {data_vol_path}')
+data_arr = da_from_data(data_vol_path)
+print(f'Loading the model from {model_path}')
+learn = load_learner(model_path.parent, model_path.name)
 # Remove the restriction on the model prediction size
 learn.data.single_ds.tfmargs['size'] = None
 # Run the loop to do repeated prediction and recombination steps
 axis = 'all'
-dir_list = setup_folder_stucture(ROOT_PATH)
+dir_list = setup_folder_stucture(root_path)
 combined_vol_paths = []
 data_arr = data_arr.compute()
+if NORMALISE:
+    print('Normalising the image data volume and downsampling to uint8.')
+    data_arr = clip_to_uint8(data_arr, ST_DEV_FACTOR)
 for k in tqdm(range(4), ncols=100, desc='Total progress'):
     key, output_path = dir_list[k]
     print(f'Key : {key}, output : {output_path}')

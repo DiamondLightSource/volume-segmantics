@@ -1,14 +1,12 @@
-# Parameters for input data
-in_root_dir: /dls/science/groups/das/SuRVoS/placenta_dataset/data3/vessel_data/not_down_sample
-data_vol_filename: data_unbinned.h5
-seg_vol_filename: seg_unbinned.h5
-# Parameters for output data
-out_root_dir: /dls/p45/data/2019/cm22981-2/processing/segmentation/win_data/200513_script_test
+# Settings for image and model output
 data_im_dirname: data # Name of folder that sliced data 2D images will be output to
 seg_im_out_dirname: seg # Name of folder that sliced segmentation 2D images with be output to 
-model_output_fn: 200513_vol3_vessels_trainedUnet256.pkl # Filename for the saved Unet Model
-codes:
-  [maternal, foetal] # The label classes corresponding to labels 0 and 1 in the segmentation
+model_output_fn: trained2dUnet_model # Suffix for the saved U-net model filename
+normalise: true # Normalise the image data before saving to disk
+st_dev_factor: 2.575 # The number of standard deviations from the mean to clip data to
+train_data_hdf5_path: /data # The internal HDF5 path to the image data
+seg_hdf5_path: /data # The internal HDF5 path to the label data
+
 # Settings for Unet training
 image_size: 256 # size of images in databunch used for training
 weight_decay: 1e-2 # weight decay 
