@@ -17,6 +17,8 @@ from fastai.utils.mem import gpu_mem_get_free_no_cache
 from fastai.vision import (SegmentationItemList, dice, get_transforms,
                            imagenet_stats, lr_find, models, open_image,
                            unet_learner)
+import matplotlib as mpl
+mpl.use('Agg')
 from matplotlib import pyplot as plt
 from skimage import exposure, img_as_ubyte, io
 from tqdm import tqdm
