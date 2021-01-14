@@ -16,6 +16,7 @@ import h5py as h5
 import numpy as np
 import yaml
 from fastai.vision import Image, crop_pad, pil2tensor
+import torch
 from skimage import exposure, img_as_float, img_as_ubyte, io
 from tqdm import tqdm
 
@@ -519,3 +520,125 @@ class PredictionDataSlicer(DataSlicerBase):
         if self.delete_vols:
             for _, vol_dir in self.dir_list:
                 os.rmdir(vol_dir)
+
+
+class PredictionHDF5DataSlicer(PredictionDataSlicer):
+
+    def __init__(self, settings, predictor):
+        logging.info(f"Using {self.__class__.__name__}")
+        super().__init__(settings, predictor)
+
+    def create_target_hdf5_files(self, directory):
+        shape_tup = self.data_vol.shape
+        zdim, ydim, xdim = shape_tup
+        for axis, chunks in (("z", (1, ydim, xdim)), ("y", (zdim, 1, xdim)), ("x", (zdim, ydim, 1))):
+            # Create an HDF5 volume with empty datasets for labels and probabilites
+            with h5.File(directory/f"unet_prediction_{axis}_axis.h5", 'w') as f:
+                f.create_dataset("labels", shape_tup, dtype='u1', chunks=chunks)
+                f['/data'] = f['/labels']
+                f.create_dataset("probabilities", shape_tup, dtype='f4', chunks=chunks)
+
+    def setup_folder_stucture(self, root_path):
+        """OVERRIDES METHOD IN PARENT CLASS.
+        Sets up a folder structure to store the predicted images.
+
+        Args:
+            root_path (Path): The top level directory for data output.
+        """
+        vol_dir = root_path/f'{date.today()}_predicted_volumes'
+        non_rotated = vol_dir/f'{date.today()}_non_rotated_volumes'
+        rot_90_seg = vol_dir/f'{date.today()}_rot_90_volumes'
+        rot_180_seg = vol_dir/f'{date.today()}_rot_180_volumes'
+        rot_270_seg = vol_dir/f'{date.today()}_rot_270_volumes'
+
+        self.dir_list = [
+            ('non_rotated', non_rotated),
+            ('rot_90_seg', rot_90_seg),
+            ('rot_180_seg', rot_180_seg),
+            ('rot_270_seg', rot_270_seg)
+        ]
+        for _, dir_path in self.dir_list:
+            os.makedirs(dir_path, exist_ok=True)
+            self.create_target_hdf5_files(dir_path)
+
+    def predict_single_slice(self, data, k):
+        """OVERRIDES METHOD IN PARENT CLASS.
+        Takes in a 2d data array and saves the predicted U-net segmentation to disk.
+
+        Args:
+            axis (str): The name of the axis to incorporate in the output filename.
+            index (int): The slice number to incorporate in the output filename.
+            data (numpy.array): The 2d data array to be fed into the U-net.
+            output_path (pathlib.Path): The path to directory for file output.
+        """
+        if isinstance(data, da.core.Array):
+            data = data.compute()
+        data = img_as_float(data)
+        data = Image(pil2tensor(data, dtype=np.float32))
+        self.fix_odd_sides(data)
+        prediction = self.predictor.model.predict(data)[2]
+        #prediction = torch.rot90(prediction, -k, [1, 2])
+        return torch.max(prediction, dim=0)
+            
+    def predict_orthog_slices_to_disk(self, data_arr, output_path, k):
+        """OVERRIDES METHOD IN PARENT CLASS.
+        Outputs slices from data or ground truth seg volumes sliced in
+         all three of the orthogonal planes
+         
+        Args:
+        data_array (numpy.array): The 3d data volume to be sliced and predicted.
+        output_path (pathlib.Path): A Path to the output directory.
+         """
+        shape_tup = data_arr.shape
+        ax_idx_pairs = self.get_axis_index_pairs(shape_tup)
+        num_ims = self.get_num_of_ims(shape_tup)
+        z_file_handle = h5.File(
+            output_path/"unet_prediction_z_axis.h5", 'r+')
+        y_file_handle = h5.File(
+            output_path/"unet_prediction_y_axis.h5", 'r+')
+        x_file_handle = h5.File(
+            output_path/"unet_prediction_x_axis.h5", 'r+')
+        for axis, index in tqdm(ax_idx_pairs, total=num_ims):
+            prob, label = self.predict_single_slice(
+                self.axis_index_to_slice(data_arr, axis, index), k)
+            if axis == 'z':
+                z_file_handle["/probabilities"][index] = prob
+                z_file_handle["/labels"][index]=label
+            if axis == 'y':
+                y_file_handle["/probabilities"][:, index]=prob
+                y_file_handle["/labels"][:, index]=label
+            if axis == 'x':
+                x_file_handle["/probabilities"][:, :, index]=prob
+                x_file_handle["/labels"][:, :, index]=label
+        z_file_handle.close()
+        y_file_handle.close()
+        x_file_handle.close()
+
+    def predict_12_ways(self, root_path):
+        """OVERRIDES METHOD IN PARENT CLASS.
+        Runs the loop that coordinates the prediction of a 3d data volume
+        by a 2d U-net in 12 orientations and then combination of the segmented
+        binary outputs.
+
+        Args:
+            root_path (pathlib.Path): Path to the top level directory for data
+            output.
+        """
+        self.setup_folder_stucture(root_path)
+        combined_vol_paths = []
+        for k in tqdm(range(4), ncols=100, desc='Total progress', postfix="\n"):
+            key, output_path = self.dir_list[k]
+            logging.info(f'Rotating volume {k * 90} degrees')
+            rotated = np.rot90(self.data_vol, k)
+            logging.info("Predicting slices to disk.")
+            self.predict_orthog_slices_to_disk(rotated, output_path, k)
+            #output_path_list = self.combine_slices_to_vol(output_path)
+            #fp = self.combine_vols(output_path_list, k, key)
+            #combined_vol_paths.append(fp)
+        # Combine all the volumes
+        # final_combined = self.combine_vols(
+        #     combined_vol_paths, 0, 'final', True)
+        # self.consensus_threshold(final_combined)
+        # if self.delete_vols:
+        #     for _, vol_dir in self.dir_list:
+        #         os.rmdir(vol_dir)
