@@ -614,6 +614,77 @@ class PredictionHDF5DataSlicer(PredictionDataSlicer):
         y_file_handle.close()
         x_file_handle.close()
 
+    # def merge_vols(self, output_path):
+    #     # Get a list of files
+    #     file_list = list(Path(output_path).glob("*.h5"))
+    #     # load 2 prob volumes and do argmax
+    #     vol1_probs = self.da_from_data(file_list[0], '/probabilities')
+    #     vol2_probs = self.da_from_data(file_list[1], '/probabilities')
+    #     combined_probs = da.stack([vol1_probs, vol2_probs])
+    #     vol1_labels = self.da_from_data(file_list[0], '/labels')
+    #     vol2_labels = self.da_from_data(file_list[1], '/labels')
+    #     combined_labels = da.stack([vol1_labels, vol2_labels])
+    #     max_prob_idx = da.argmax(combined_probs, axis=0)
+    #     max_prob_idx = max_prob_idx.compute()
+    #     max_prob_idx = max_prob_idx[np.newaxis, :, :, :]
+    #     combined_probs = combined_probs.compute()
+    #     max_probs = np.take_along_axis(
+    #         combined_probs, max_prob_idx, axis=0)
+    #     max_probs = np.squeeze(max_probs)
+    #     combined_labels = combined_labels.compute()
+    #     max_labels = np.take_along_axis(
+    #         combined_labels, max_prob_idx, axis=0)
+    #     max_labels = np.squeeze(max_labels)
+    #     with h5.File(output_path/"max_out.h5", 'w') as f:
+    #         f['/probabilities'] = max_probs.astype('f4')
+    #         f['/labels'] = max_labels.astype('u1')
+
+    def open_hdf5_to_numpy(self, filepath, hdf5_path="/data"):
+        with h5.File(filepath, 'r') as f:
+            data = f[hdf5_path][()]
+        return data
+
+
+    def merge_vols(self, output_path, file_list, final=False):
+        if final:
+            combined_out_path = file_list[0].parent / \
+                f'{date.today()}_12_volumes_combined.h5'
+        else:
+            combined_out_path = output_path/"max_out.h5"
+        logging.info("Merging output data using maximum probabilties:"
+                     f"Starting with {file_list[0].name}")
+        current_probs = self.open_hdf5_to_numpy(file_list[0], '/probabilities')
+        current_labels = self.open_hdf5_to_numpy(file_list[0], '/labels')
+        for subsequent in file_list[1:]:
+            logging.info(f"\nMerging with {subsequent.name}")
+            next_probs = self.open_hdf5_to_numpy(subsequent, '/probabilities')
+            next_labels = self.open_hdf5_to_numpy(subsequent, '/labels')
+            combined_probs = np.stack([current_probs, next_probs])
+            combined_labels = np.stack([current_labels, next_labels])
+            max_prob_idx = np.argmax(combined_probs, axis=0)
+            max_prob_idx = max_prob_idx[np.newaxis, :, :, :]
+            max_prob_vals = np.take_along_axis(
+                combined_probs, max_prob_idx, axis=0)
+            max_labels = np.take_along_axis(
+            combined_labels, max_prob_idx, axis=0)
+            max_labels = np.squeeze(max_labels)
+            max_prob_vals = np.squeeze(max_prob_vals)
+            current_probs = max_prob_vals
+        if final:
+            combined_out_path = file_list[0].parent / \
+                f'{date.today()}_12_volumes_combined.h5'
+        else:
+            combined_out_path = output_path/"max_out.h5"
+        with h5.File(combined_out_path, 'w') as f:
+            f['/probabilities'] = current_probs.astype('f4')
+            f['/labels'] = current_labels.astype('u1')
+            f['/data'] = f['/labels']
+        # Remove source volumes
+        logging.info("Removing source h5 files.")
+        for h5_file in file_list:
+            os.remove(h5_file)
+        return combined_out_path
+
     def predict_12_ways(self, root_path):
         """OVERRIDES METHOD IN PARENT CLASS.
         Runs the loop that coordinates the prediction of a 3d data volume
@@ -630,11 +701,12 @@ class PredictionHDF5DataSlicer(PredictionDataSlicer):
             key, output_path = self.dir_list[k]
             logging.info(f'Rotating volume {k * 90} degrees')
             rotated = np.rot90(self.data_vol, k)
-            logging.info("Predicting slices to disk.")
+            logging.info("Predicting slices to HDF5 files.")
             self.predict_orthog_slices_to_disk(rotated, output_path, k)
-            #output_path_list = self.combine_slices_to_vol(output_path)
-            #fp = self.combine_vols(output_path_list, k, key)
-            #combined_vol_paths.append(fp)
+            # Add step to merge the three volumes
+            file_list = list(Path(output_path).glob("*.h5"))
+            fp = self.merge_vols(output_path, file_list)
+            combined_vol_paths.append(fp)
         # Combine all the volumes
         # final_combined = self.combine_vols(
         #     combined_vol_paths, 0, 'final', True)
