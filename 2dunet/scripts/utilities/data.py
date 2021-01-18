@@ -67,10 +67,10 @@ class DataSlicerBase:
     def __init__(self, settings):
         self.st_dev_factor = settings.st_dev_factor
         if settings.normalise:
-            self.data_vol = self.clip_to_uint8(self.data_vol.compute())
+            self.data_vol = self.clip_to_uint8(self.data_vol)
 
-    def da_from_data(self, path, hdf5_path='/data'):
-        """Returns a dask array when given a path to an HDF5 file.
+    def numpy_from_hdf5(self, path, hdf5_path='/data'):
+        """Returns a numpy array when given a path to an HDF5 file.
 
         The data is assumed to be found in '/data' in the file.
 
@@ -79,11 +79,11 @@ class DataSlicerBase:
             hdf5_path (str): The internal HDF5 path to the data.
 
         Returns:
-            dask.array: A dask array object for the data stored in the HDF5 file.
+            numpy.array: A numpy array object for the data stored in the HDF5 file.
         """
-        f = h5.File(path, 'r')
-        d = f[hdf5_path]
-        return da.from_array(d, chunks='auto')
+        with h5.File(path, 'r') as f:
+            data = f[hdf5_path][()]
+        return data
 
     def clip_to_uint8(self, data):
         """Clips data to a certain number of st_devs of the mean and reduces
@@ -174,16 +174,16 @@ class TrainingDataSlicer(DataSlicerBase):
 
     def __init__(self, settings):
         data_vol_path = getattr(settings, cfg.TRAIN_DATA_ARG)
-        self.data_vol = self.da_from_data(data_vol_path,
+        self.data_vol = self.numpy_from_hdf5(data_vol_path,
                                           hdf5_path=settings.train_data_hdf5_path)
         super().__init__(settings)
         self.multilabel = False
         self.data_im_out_dir = None
         self.seg_im_out_dir = None
         seg_vol_path = getattr(settings, cfg.LABEL_DATA_ARG)
-        self.seg_vol = self.da_from_data(seg_vol_path,
+        self.seg_vol = self.numpy_from_hdf5(seg_vol_path,
                                          hdf5_path=settings.seg_hdf5_path)
-        seg_classes = np.unique(self.seg_vol.compute())
+        seg_classes = np.unique(self.seg_vol)
         self.num_seg_classes = len(seg_classes)
         if self.num_seg_classes > 2:
             self.multilabel = True
@@ -203,7 +203,7 @@ class TrainingDataSlicer(DataSlicerBase):
             seg_classes(list): An ascending list of the labels in the volume.
         """
         if isinstance(self.seg_vol, da.core.Array):
-            self.seg_vol = self.seg_vol.compute()
+            self.seg_vol = self.seg_vol
         for idx, current in enumerate(seg_classes):
             self.seg_vol[self.seg_vol == current] = idx
 
@@ -257,8 +257,6 @@ class TrainingDataSlicer(DataSlicerBase):
             path (str): The path of the image file including the filename prefix.
             label (bool): Whether to convert values >1 to 1 for binary segmentation.
         """
-        if isinstance(data, da.core.Array):
-            data = data.compute()
         if label and not self.multilabel:
             data[data > 1] = 1
         io.imsave(f'{path}.png', data)
@@ -312,7 +310,7 @@ class PredictionDataSlicer(DataSlicerBase):
 
     def __init__(self, settings, predictor):
         data_vol_path = getattr(settings, cfg.PREDICT_DATA_ARG)
-        self.data_vol = self.da_from_data(data_vol_path,
+        self.data_vol = self.numpy_from_hdf5(data_vol_path,
                                           hdf5_path=settings.predict_data_hdf5_path)
         super().__init__(settings)
         self.consensus_vals = map(int, settings.consensus_vals)
@@ -405,16 +403,16 @@ class PredictionDataSlicer(DataSlicerBase):
             pathlib.Path: A file path to the combined HDF5 volume that was saved.
         """
         num_vols = len(output_path_list)
-        combined = self.da_from_data(output_path_list[0])
+        combined = self.numpy_from_hdf5(output_path_list[0])
         for subsequent in output_path_list[1:]:
-            combined += self.da_from_data(subsequent)
+            combined += self.numpy_from_hdf5(subsequent)
         combined_out_path = output_path_list[0].parent.parent / \
             f'{date.today()}_{prefix}_{num_vols}_volumes_combined.h5'
         if final:
             combined_out_path = output_path_list[0].parent / \
                 f'{date.today()}_{prefix}_12_volumes_combined.h5'
         logging.info(f'Saving the {num_vols} combined volumes to {combined_out_path}')
-        combined = combined.compute()
+        combined = combined
         combined = np.rot90(combined, 0 - k)
         with h5.File(combined_out_path, 'w') as f:
             f['/data'] = combined
@@ -433,8 +431,6 @@ class PredictionDataSlicer(DataSlicerBase):
             data (numpy.array): The 2d data array to be fed into the U-net.
             output_path (pathlib.Path): The path to directory for file output.
         """
-        if isinstance(data, da.core.Array):
-            data = data.compute()
         data = img_as_float(data)
         img = Image(pil2tensor(data, dtype=np.float32))
         self.fix_odd_sides(img)
@@ -486,7 +482,7 @@ class PredictionDataSlicer(DataSlicerBase):
              to be thresholded.
         """
         for val in self.consensus_vals:
-            combined = self.da_from_data(input_path)
+            combined = self.numpy_from_hdf5(input_path)
             combined_out = input_path.parent / \
                 f'{date.today()}_combined_consensus_thresh_cutoff_{val}.h5'
             combined[combined < val] = 0
@@ -577,7 +573,6 @@ class PredictionHDF5DataSlicer(PredictionDataSlicer):
         data = Image(pil2tensor(data, dtype=np.float32))
         self.fix_odd_sides(data)
         prediction = self.predictor.model.predict(data)[2]
-        #prediction = torch.rot90(prediction, -k, [1, 2])
         return torch.max(prediction, dim=0)
             
     def predict_orthog_slices_to_disk(self, data_arr, output_path, k):
@@ -614,51 +609,42 @@ class PredictionHDF5DataSlicer(PredictionDataSlicer):
         y_file_handle.close()
         x_file_handle.close()
 
-    # def merge_vols(self, output_path):
-    #     # Get a list of files
-    #     file_list = list(Path(output_path).glob("*.h5"))
-    #     # load 2 prob volumes and do argmax
-    #     vol1_probs = self.da_from_data(file_list[0], '/probabilities')
-    #     vol2_probs = self.da_from_data(file_list[1], '/probabilities')
-    #     combined_probs = da.stack([vol1_probs, vol2_probs])
-    #     vol1_labels = self.da_from_data(file_list[0], '/labels')
-    #     vol2_labels = self.da_from_data(file_list[1], '/labels')
-    #     combined_labels = da.stack([vol1_labels, vol2_labels])
-    #     max_prob_idx = da.argmax(combined_probs, axis=0)
-    #     max_prob_idx = max_prob_idx.compute()
-    #     max_prob_idx = max_prob_idx[np.newaxis, :, :, :]
-    #     combined_probs = combined_probs.compute()
-    #     max_probs = np.take_along_axis(
-    #         combined_probs, max_prob_idx, axis=0)
-    #     max_probs = np.squeeze(max_probs)
-    #     combined_labels = combined_labels.compute()
-    #     max_labels = np.take_along_axis(
-    #         combined_labels, max_prob_idx, axis=0)
-    #     max_labels = np.squeeze(max_labels)
-    #     with h5.File(output_path/"max_out.h5", 'w') as f:
-    #         f['/probabilities'] = max_probs.astype('f4')
-    #         f['/labels'] = max_labels.astype('u1')
-
-    def open_hdf5_to_numpy(self, filepath, hdf5_path="/data"):
+    def hdf5_to_rotated_numpy(self, filepath, hdf5_path="/data", rotate=True):
         with h5.File(filepath, 'r') as f:
             data = f[hdf5_path][()]
+        if rotate:
+            # Find which rotation this data has been subjected to, rotate back
+            fp_nums = re.findall(r"\d+", filepath.parent.name)
+            if '90' in fp_nums:
+                data = np.swapaxes(data, 0, 1)
+                data = np.fliplr(data)
+            elif '180' in fp_nums:
+                data = np.rot90(data, 2, (0, 1))
+            elif '270' in fp_nums:
+                data = np.fliplr(data)
+                data = np.swapaxes(data, 0, 1)
         return data
 
-
-    def merge_vols(self, output_path, file_list, final=False):
+    def merge_vols(self, file_list, final=False):
+        rotate = False
+        output_path = file_list[0].parent
         if final:
-            combined_out_path = file_list[0].parent / \
+            rotate = True
+            combined_out_path = output_path.parent / \
                 f'{date.today()}_12_volumes_combined.h5'
         else:
             combined_out_path = output_path/"max_out.h5"
-        logging.info("Merging output data using maximum probabilties:"
-                     f"Starting with {file_list[0].name}")
-        current_probs = self.open_hdf5_to_numpy(file_list[0], '/probabilities')
-        current_labels = self.open_hdf5_to_numpy(file_list[0], '/labels')
+        logging.info("Merging output data using maximum probabilties:")
+        logging.info(f"Starting with {file_list[0].name}")
+        current_probs = self.hdf5_to_rotated_numpy(file_list[0], '/probabilities', rotate)
+        current_labels = self.hdf5_to_rotated_numpy(
+            file_list[0], '/labels', rotate)
         for subsequent in file_list[1:]:
-            logging.info(f"\nMerging with {subsequent.name}")
-            next_probs = self.open_hdf5_to_numpy(subsequent, '/probabilities')
-            next_labels = self.open_hdf5_to_numpy(subsequent, '/labels')
+            logging.info(f"Merging with {subsequent.name}")
+            next_probs = self.hdf5_to_rotated_numpy(
+                subsequent, '/probabilities', rotate)
+            next_labels = self.hdf5_to_rotated_numpy(
+                subsequent, '/labels', rotate)
             combined_probs = np.stack([current_probs, next_probs])
             combined_labels = np.stack([current_labels, next_labels])
             max_prob_idx = np.argmax(combined_probs, axis=0)
@@ -670,19 +656,16 @@ class PredictionHDF5DataSlicer(PredictionDataSlicer):
             max_labels = np.squeeze(max_labels)
             max_prob_vals = np.squeeze(max_prob_vals)
             current_probs = max_prob_vals
-        if final:
-            combined_out_path = file_list[0].parent / \
-                f'{date.today()}_12_volumes_combined.h5'
-        else:
-            combined_out_path = output_path/"max_out.h5"
+            current_labels = max_labels
         with h5.File(combined_out_path, 'w') as f:
             f['/probabilities'] = current_probs.astype('f4')
             f['/labels'] = current_labels.astype('u1')
             f['/data'] = f['/labels']
-        # Remove source volumes
-        logging.info("Removing source h5 files.")
-        for h5_file in file_list:
-            os.remove(h5_file)
+        if self.delete_vols:
+            # Remove source volumes
+            logging.info("Removing source h5 files.")
+            for h5_file in file_list:
+                os.remove(h5_file)
         return combined_out_path
 
     def predict_12_ways(self, root_path):
@@ -705,12 +688,10 @@ class PredictionHDF5DataSlicer(PredictionDataSlicer):
             self.predict_orthog_slices_to_disk(rotated, output_path, k)
             # Add step to merge the three volumes
             file_list = list(Path(output_path).glob("*.h5"))
-            fp = self.merge_vols(output_path, file_list)
+            fp = self.merge_vols(file_list)
             combined_vol_paths.append(fp)
         # Combine all the volumes
-        # final_combined = self.combine_vols(
-        #     combined_vol_paths, 0, 'final', True)
-        # self.consensus_threshold(final_combined)
-        # if self.delete_vols:
-        #     for _, vol_dir in self.dir_list:
-        #         os.rmdir(vol_dir)
+        self.merge_vols(combined_vol_paths, final=True)
+        if self.delete_vols:
+            for _, vol_dir in self.dir_list:
+                os.rmdir(vol_dir)
