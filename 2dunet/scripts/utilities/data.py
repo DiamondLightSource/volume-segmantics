@@ -524,15 +524,13 @@ class PredictionHDF5DataSlicer(PredictionDataSlicer):
         logging.info(f"Using {self.__class__.__name__}")
         super().__init__(settings, predictor)
 
-    def create_target_hdf5_files(self, directory):
-        shape_tup = self.data_vol.shape
-        zdim, ydim, xdim = shape_tup
-        for axis, chunks in (("z", (1, ydim, xdim)), ("y", (zdim, 1, xdim)), ("x", (zdim, ydim, 1))):
+    def create_target_hdf5_files(self, directory, shape_tup):
+        for axis in ("z", "y", "x"):
             # Create an HDF5 volume with empty datasets for labels and probabilites
             with h5.File(directory/f"unet_prediction_{axis}_axis.h5", 'w') as f:
-                f.create_dataset("labels", shape_tup, dtype='u1', chunks=chunks)
+                f.create_dataset("labels", shape_tup, dtype='u1')
                 f['/data'] = f['/labels']
-                f.create_dataset("probabilities", shape_tup, dtype='f4', chunks=chunks)
+                f.create_dataset("probabilities", shape_tup, dtype=np.float16)
 
     def setup_folder_stucture(self, root_path):
         """OVERRIDES METHOD IN PARENT CLASS.
@@ -555,20 +553,19 @@ class PredictionHDF5DataSlicer(PredictionDataSlicer):
         ]
         for _, dir_path in self.dir_list:
             os.makedirs(dir_path, exist_ok=True)
-            self.create_target_hdf5_files(dir_path)
+            #self.create_target_hdf5_files(dir_path)
 
-    def predict_single_slice(self, data, k):
+    def predict_single_slice(self, data):
         """OVERRIDES METHOD IN PARENT CLASS.
-        Takes in a 2d data array and saves the predicted U-net segmentation to disk.
+        Takes in a 2d data array and returns the max and argmax of the predicted probabilities.
 
         Args:
-            axis (str): The name of the axis to incorporate in the output filename.
-            index (int): The slice number to incorporate in the output filename.
             data (numpy.array): The 2d data array to be fed into the U-net.
-            output_path (pathlib.Path): The path to directory for file output.
+
+        Returns:
+            torch.tensor: A 3d torch tensor containing a 2d array with max probabilities
+            and a 2d array with argmax indices.
         """
-        if isinstance(data, da.core.Array):
-            data = data.compute()
         data = img_as_float(data)
         data = Image(pil2tensor(data, dtype=np.float32))
         self.fix_odd_sides(data)
@@ -585,32 +582,45 @@ class PredictionHDF5DataSlicer(PredictionDataSlicer):
         output_path (pathlib.Path): A Path to the output directory.
          """
         shape_tup = data_arr.shape
-        ax_idx_pairs = self.get_axis_index_pairs(shape_tup)
-        num_ims = self.get_num_of_ims(shape_tup)
+        # Create HDF5 files for the predicted data
+        self.create_target_hdf5_files(output_path, shape_tup)
+        # Axis by axis
+        z_ax_idx_pairs = product('z', range(shape_tup[0]))
+        y_ax_idx_pairs = product('y', range(shape_tup[1]))
+        x_ax_idx_pairs = product('x', range(shape_tup[2]))
         z_file_handle = h5.File(
-            output_path/"unet_prediction_z_axis.h5", 'r+')
+            output_path/"unet_prediction_z_axis.h5", 'r+',
+            driver='core')
         y_file_handle = h5.File(
-            output_path/"unet_prediction_y_axis.h5", 'r+')
+            output_path/"unet_prediction_y_axis.h5", 'r+',
+            driver='core')
         x_file_handle = h5.File(
-            output_path/"unet_prediction_x_axis.h5", 'r+')
-        for axis, index in tqdm(ax_idx_pairs, total=num_ims):
+            output_path/"unet_prediction_x_axis.h5", 'r+',
+            driver='core')
+        logging.info("Predicting Z slices:")
+        for axis, index in tqdm(z_ax_idx_pairs, total=shape_tup[0]):
             prob, label = self.predict_single_slice(
-                self.axis_index_to_slice(data_arr, axis, index), k)
-            if axis == 'z':
-                z_file_handle["/probabilities"][index] = prob
-                z_file_handle["/labels"][index]=label
-            if axis == 'y':
-                y_file_handle["/probabilities"][:, index]=prob
-                y_file_handle["/labels"][:, index]=label
-            if axis == 'x':
-                x_file_handle["/probabilities"][:, :, index]=prob
-                x_file_handle["/labels"][:, :, index]=label
+                self.axis_index_to_slice(data_arr, axis, index))
+            z_file_handle["/probabilities"][index] = prob
+            z_file_handle["/labels"][index]=label
         z_file_handle.close()
+        logging.info("Predicting Y slices:")
+        for axis, index in tqdm(y_ax_idx_pairs, total=shape_tup[1]):
+            prob, label = self.predict_single_slice(
+                self.axis_index_to_slice(data_arr, axis, index))
+            y_file_handle["/probabilities"][:, index]=prob
+            y_file_handle["/labels"][:, index]=label
         y_file_handle.close()
+        logging.info("Predicting X slices:")
+        for axis, index in tqdm(x_ax_idx_pairs, total=shape_tup[2]):
+            prob, label = self.predict_single_slice(
+                self.axis_index_to_slice(data_arr, axis, index))
+            x_file_handle["/probabilities"][:, :, index]=prob
+            x_file_handle["/labels"][:, :, index]=label
         x_file_handle.close()
 
     def hdf5_to_rotated_numpy(self, filepath, hdf5_path="/data", rotate=True):
-        with h5.File(filepath, 'r') as f:
+        with h5.File(filepath, 'r', rdcc_nbytes=1024**2*1000, rdcc_nslots=1e5) as f:
             data = f[hdf5_path][()]
         if rotate:
             # Find which rotation this data has been subjected to, rotate back
@@ -658,7 +668,7 @@ class PredictionHDF5DataSlicer(PredictionDataSlicer):
             current_probs = max_prob_vals
             current_labels = max_labels
         with h5.File(combined_out_path, 'w') as f:
-            f['/probabilities'] = current_probs.astype('f4')
+            f['/probabilities'] = current_probs.astype(np.float16)
             f['/labels'] = current_labels.astype('u1')
             f['/data'] = f['/labels']
         if self.delete_vols:
