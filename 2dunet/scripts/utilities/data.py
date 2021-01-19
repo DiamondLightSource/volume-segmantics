@@ -312,6 +312,7 @@ class PredictionDataSlicer(DataSlicerBase):
         data_vol_path = getattr(settings, cfg.PREDICT_DATA_ARG)
         self.data_vol = self.numpy_from_hdf5(data_vol_path,
                                           hdf5_path=settings.predict_data_hdf5_path)
+        self.data_vol_shape = self.data_vol.shape
         super().__init__(settings)
         self.consensus_vals = map(int, settings.consensus_vals)
         self.predictor = predictor
@@ -582,100 +583,96 @@ class PredictionHDF5DataSlicer(PredictionDataSlicer):
         output_path (pathlib.Path): A Path to the output directory.
          """
         shape_tup = data_arr.shape
-        # Create HDF5 files for the predicted data
-        self.create_target_hdf5_files(output_path, shape_tup)
         # Axis by axis
         z_ax_idx_pairs = product('z', range(shape_tup[0]))
         y_ax_idx_pairs = product('y', range(shape_tup[1]))
         x_ax_idx_pairs = product('x', range(shape_tup[2]))
-        z_file_handle = h5.File(
-            output_path/"unet_prediction_z_axis.h5", 'r+',
-            driver='core')
-        y_file_handle = h5.File(
-            output_path/"unet_prediction_y_axis.h5", 'r+',
-            driver='core')
-        x_file_handle = h5.File(
-            output_path/"unet_prediction_x_axis.h5", 'r+',
-            driver='core')
+        # Create volumes for label and prob data
+        logging.info("Creating empty data volumes in RAM")
+        label_container = np.empty((2, *shape_tup), dtype=np.uint8)
+        prob_container = np.empty((2, *shape_tup), dtype=np.float16)
         logging.info("Predicting Z slices:")
         for axis, index in tqdm(z_ax_idx_pairs, total=shape_tup[0]):
             prob, label = self.predict_single_slice(
                 self.axis_index_to_slice(data_arr, axis, index))
-            z_file_handle["/probabilities"][index] = prob
-            z_file_handle["/labels"][index]=label
-        z_file_handle.close()
+            prob_container[0, index] = prob
+            label_container[0, index] = label
         logging.info("Predicting Y slices:")
         for axis, index in tqdm(y_ax_idx_pairs, total=shape_tup[1]):
             prob, label = self.predict_single_slice(
                 self.axis_index_to_slice(data_arr, axis, index))
-            y_file_handle["/probabilities"][:, index]=prob
-            y_file_handle["/labels"][:, index]=label
-        y_file_handle.close()
+            prob_container[1, :, index] = prob
+            label_container[1, :, index] = label
+        logging.info("Merging Z and Y volumes.")
+        # Merge these volumes and replace the volume at index 0 in the container
+        self.merge_vols_in_mem(prob_container, label_container)
         logging.info("Predicting X slices:")
         for axis, index in tqdm(x_ax_idx_pairs, total=shape_tup[2]):
             prob, label = self.predict_single_slice(
                 self.axis_index_to_slice(data_arr, axis, index))
-            x_file_handle["/probabilities"][:, :, index]=prob
-            x_file_handle["/labels"][:, :, index]=label
-        x_file_handle.close()
+            prob_container[1, :, :, index] = prob
+            label_container[1, :, :, index]=label
+        logging.info("Merging max of Z and Y with the X volume.")
+        # Merge these volumes and replace the volume at index 0 in the container
+        self.merge_vols_in_mem(prob_container, label_container)
+        logging.info("Saving combined labels and probabilities to disk.")
+        combined_out = output_path/"max_out.h5"
+        with h5.File(combined_out, 'w') as f:
+            f['/probabilities'] = prob_container[0]
+            f['/labels'] = label_container[0]
+            f['/data'] = f['/labels']
+        return combined_out
 
-    def hdf5_to_rotated_numpy(self, filepath, hdf5_path="/data", rotate=True):
-        with h5.File(filepath, 'r', rdcc_nbytes=1024**2*1000, rdcc_nslots=1e5) as f:
+    def merge_vols_in_mem(self, prob_container, label_container):
+        max_prob_idx = np.argmax(prob_container, axis=0)
+        max_prob_idx = max_prob_idx[np.newaxis, :, :, :]
+        prob_container[0] = np.squeeze(np.take_along_axis(
+            prob_container, max_prob_idx, axis=0))
+        label_container[0] = np.squeeze(np.take_along_axis(
+            label_container, max_prob_idx, axis=0))
+
+    def hdf5_to_rotated_numpy(self, filepath, hdf5_path="/data"):
+        with h5.File(filepath, 'r') as f:
             data = f[hdf5_path][()]
-        if rotate:
-            # Find which rotation this data has been subjected to, rotate back
-            fp_nums = re.findall(r"\d+", filepath.parent.name)
-            if '90' in fp_nums:
-                data = np.swapaxes(data, 0, 1)
-                data = np.fliplr(data)
-            elif '180' in fp_nums:
-                data = np.rot90(data, 2, (0, 1))
-            elif '270' in fp_nums:
-                data = np.fliplr(data)
-                data = np.swapaxes(data, 0, 1)
+        # Find which rotation this data has been subjected to, rotate back
+        fp_nums = re.findall(r"\d+", filepath.parent.name)
+        if '90' in fp_nums:
+            data = np.swapaxes(data, 0, 1)
+            data = np.fliplr(data)
+        elif '180' in fp_nums:
+            data = np.rot90(data, 2, (0, 1))
+        elif '270' in fp_nums:
+            data = np.fliplr(data)
+            data = np.swapaxes(data, 0, 1)
         return data
 
-    def merge_vols(self, file_list, final=False):
-        rotate = False
+    def merge_final_vols(self, file_list):
+
         output_path = file_list[0].parent
-        if final:
-            rotate = True
-            combined_out_path = output_path.parent / \
+        combined_out_path = output_path.parent / \
                 f'{date.today()}_12_volumes_combined.h5'
-        else:
-            combined_out_path = output_path/"max_out.h5"
-        logging.info("Merging output data using maximum probabilties:")
-        logging.info(f"Starting with {file_list[0].name}")
-        current_probs = self.hdf5_to_rotated_numpy(file_list[0], '/probabilities', rotate)
-        current_labels = self.hdf5_to_rotated_numpy(
-            file_list[0], '/labels', rotate)
+        logging.info("Merging final output data using maximum probabilties:")
+        logging.info("Creating empty data volumes in RAM")
+        label_container = np.empty((2, *self.data_vol_shape), dtype=np.uint8)
+        prob_container = np.empty((2, *self.data_vol_shape), dtype=np.float16)
+        logging.info(f"Starting with {file_list[0].parent.name} {file_list[0].name}")
+        prob_container[0] = self.hdf5_to_rotated_numpy(
+            file_list[0], '/probabilities')
+        label_container[0] = self.hdf5_to_rotated_numpy(
+            file_list[0], '/labels')
         for subsequent in file_list[1:]:
-            logging.info(f"Merging with {subsequent.name}")
-            next_probs = self.hdf5_to_rotated_numpy(
-                subsequent, '/probabilities', rotate)
-            next_labels = self.hdf5_to_rotated_numpy(
-                subsequent, '/labels', rotate)
-            combined_probs = np.stack([current_probs, next_probs])
-            combined_labels = np.stack([current_labels, next_labels])
-            max_prob_idx = np.argmax(combined_probs, axis=0)
-            max_prob_idx = max_prob_idx[np.newaxis, :, :, :]
-            max_prob_vals = np.take_along_axis(
-                combined_probs, max_prob_idx, axis=0)
-            max_labels = np.take_along_axis(
-            combined_labels, max_prob_idx, axis=0)
-            max_labels = np.squeeze(max_labels)
-            max_prob_vals = np.squeeze(max_prob_vals)
-            current_probs = max_prob_vals
-            current_labels = max_labels
+            logging.info(f"Merging with {subsequent.parent.name} {subsequent.name}")
+            prob_container[1] = self.hdf5_to_rotated_numpy(
+                subsequent, '/probabilities')
+            label_container[1] = self.hdf5_to_rotated_numpy(
+                subsequent, '/labels')
+            self.merge_vols_in_mem(prob_container, label_container)
+        logging.info(f"Saving final data out to: {combined_out_path}.")
         with h5.File(combined_out_path, 'w') as f:
-            f['/probabilities'] = current_probs.astype(np.float16)
-            f['/labels'] = current_labels.astype('u1')
+            f['/probabilities'] = prob_container[0]
+            f['/labels'] = label_container[0]
             f['/data'] = f['/labels']
-        if self.delete_vols:
-            # Remove source volumes
-            logging.info("Removing source h5 files.")
-            for h5_file in file_list:
-                os.remove(h5_file)
+        
         return combined_out_path
 
     def predict_12_ways(self, root_path):
@@ -691,17 +688,14 @@ class PredictionHDF5DataSlicer(PredictionDataSlicer):
         self.setup_folder_stucture(root_path)
         combined_vol_paths = []
         for k in tqdm(range(4), ncols=100, desc='Total progress', postfix="\n"):
-            key, output_path = self.dir_list[k]
+            _, output_path = self.dir_list[k]
             logging.info(f'Rotating volume {k * 90} degrees')
             rotated = np.rot90(self.data_vol, k)
             logging.info("Predicting slices to HDF5 files.")
-            self.predict_orthog_slices_to_disk(rotated, output_path, k)
-            # Add step to merge the three volumes
-            file_list = list(Path(output_path).glob("*.h5"))
-            fp = self.merge_vols(file_list)
+            fp =  self.predict_orthog_slices_to_disk(rotated, output_path, k)
             combined_vol_paths.append(fp)
         # Combine all the volumes
-        self.merge_vols(combined_vol_paths, final=True)
+        self.merge_final_vols(combined_vol_paths)
         if self.delete_vols:
             for _, vol_dir in self.dir_list:
                 os.rmdir(vol_dir)
