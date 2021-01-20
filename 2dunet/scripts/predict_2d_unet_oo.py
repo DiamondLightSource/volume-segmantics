@@ -57,5 +57,8 @@ if __name__ == "__main__":
     predictor = Unet2dPredictor(root_path)
     predictor.create_model_from_zip(model_file_path)
     # Create a slicer to slice and predict the segmentations from the data
-    slicer = PredictionHDF5DataSlicer(settings, predictor)
+    if settings.use_max_probs:
+        slicer = PredictionHDF5DataSlicer(settings, predictor)
+    else:
+        slicer = PredictionDataSlicer(settings, predictor)
     slicer.predict_12_ways(root_path)

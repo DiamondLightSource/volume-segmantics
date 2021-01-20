@@ -8,7 +8,7 @@ from pathlib import Path
 
 from utilities import config as cfg
 from utilities.cmdline import CheckExt
-from utilities.data import (PredictionDataSlicer, SettingsData,
+from utilities.data import (PredictionHDF5DataSlicer, PredictionDataSlicer, SettingsData,
                             TrainingDataSlicer)
 from utilities.unet2d import Unet2dPredictor, Unet2dTrainer
 
@@ -82,5 +82,8 @@ if __name__ == "__main__":
     predictor = Unet2dPredictor(root_path)
     predictor.get_model_from_trainer(trainer)
     # Create a slicer to slice and predict the segmentations from the data
-    predict_slicer = PredictionDataSlicer(predict_settings, predictor)
+    if predict_settings.use_max_probs:
+        predict_slicer = PredictionHDF5DataSlicer(predict_settings, predictor)
+    else:
+        predict_slicer = PredictionDataSlicer(predict_settings, predictor)
     predict_slicer.predict_12_ways(root_path)

@@ -489,7 +489,8 @@ class PredictionDataSlicer(DataSlicerBase):
             combined[combined < val] = 0
             combined[combined >= val] = 255
             logging.info(f'Writing to {combined_out}')
-            combined.to_hdf5(combined_out, '/data')
+            with h5.File(combined_out, 'w') as f:
+                f['/data'] = combined
 
     def predict_12_ways(self, root_path):
         """Runs the loop that coordinates the prediction of a 3d data volume
@@ -524,6 +525,7 @@ class PredictionHDF5DataSlicer(PredictionDataSlicer):
     def __init__(self, settings, predictor):
         logging.info(f"Using {self.__class__.__name__}")
         super().__init__(settings, predictor)
+        self.output_probs = settings.output_probs
 
     def create_target_hdf5_files(self, directory, shape_tup):
         for axis in ("z", "y", "x"):
@@ -649,8 +651,10 @@ class PredictionHDF5DataSlicer(PredictionDataSlicer):
     def merge_final_vols(self, file_list):
 
         output_path = file_list[0].parent
-        combined_out_path = output_path.parent / \
+        combined_label_out_path = output_path.parent / \
                 f'{date.today()}_12_volumes_combined.h5'
+        combined_prob_out_path = output_path.parent / \
+            f'{date.today()}_12_volumes_combined_probabilities.h5'
         logging.info("Merging final output data using maximum probabilties:")
         logging.info("Creating empty data volumes in RAM")
         label_container = np.empty((2, *self.data_vol_shape), dtype=np.uint8)
@@ -667,13 +671,15 @@ class PredictionHDF5DataSlicer(PredictionDataSlicer):
             label_container[1] = self.hdf5_to_rotated_numpy(
                 subsequent, '/labels')
             self.merge_vols_in_mem(prob_container, label_container)
-        logging.info(f"Saving final data out to: {combined_out_path}.")
-        with h5.File(combined_out_path, 'w') as f:
-            f['/probabilities'] = prob_container[0]
+        logging.info(f"Saving final data out to: {combined_label_out_path}.")
+        with h5.File(combined_label_out_path, 'w') as f:
             f['/labels'] = label_container[0]
             f['/data'] = f['/labels']
-        
-        return combined_out_path
+        if self.output_probs:
+            logging.info(f"Saving final probabilities out to: {combined_prob_out_path}.")
+            with h5.File(combined_prob_out_path, 'w') as f:
+                f['/probabilities'] = prob_container[0]
+                f['/data'] = f['/probabilities']
 
     def predict_12_ways(self, root_path):
         """OVERRIDES METHOD IN PARENT CLASS.
@@ -697,5 +703,9 @@ class PredictionHDF5DataSlicer(PredictionDataSlicer):
         # Combine all the volumes
         self.merge_final_vols(combined_vol_paths)
         if self.delete_vols:
+            # Remove source volumes
+            logging.info("Removing maximum probability h5 files.")
+            for h5_file in combined_vol_paths:
+                os.remove(h5_file)
             for _, vol_dir in self.dir_list:
                 os.rmdir(vol_dir)

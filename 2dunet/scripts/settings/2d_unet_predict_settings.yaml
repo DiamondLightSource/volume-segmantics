@@ -1,8 +1,11 @@
-# Settings for predictiopn of a 3d volume using a 2d U-net
-consensus_vals: # List of consensus cutoff values for agreement between volumes. One volume is saved per value.
-  [8, 9]        # e.g. if 10 is in the list a volume will be thresholded on consensus between 10 volumes and saved.
+# Settings for prediction of a 3d volume using a 2d U-net
+use_max_probs: True # If True combine the predicted volumes using maximum probabilies, if False, combine the predicded labels and threshold
+                    # the data using using consensus values (This will only work for data with 2 labels).
+output_probs: False # If set to True a separate volume of probabilty values for the predictions will be saved alongside the labels.
 normalise: True # If set to True, the image data will be clipped and normalised before prediction. Set to False if data is already normalised.
 st_dev_factor: 2.575 # Number of standard deviations from the mean to clip data to.
 predict_data_hdf5_path: /data # Internal path in the HDF5 file where the image data for prediction is stored.
 del_vols: True # Whether to clean up the 16 intermediate predicted volumes to save disk space.
+consensus_vals: # List of consensus cutoff values for agreement between volumes if use_max_probs is set to False. One volume is saved per value.
+  [8, 9]        # e.g. if 10 is in the list a volume will be thresholded on consensus between 10 volumes and saved.
 cuda_device: 0 # Change this if you would like to run the prediction on a different GPU
