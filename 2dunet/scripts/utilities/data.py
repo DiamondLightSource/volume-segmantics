@@ -69,7 +69,7 @@ class DataSlicerBase:
         if settings.normalise:
             self.data_vol = self.clip_to_uint8(self.data_vol)
 
-    def numpy_from_hdf5(self, path, hdf5_path='/data'):
+    def numpy_from_hdf5(self, path, hdf5_path='/data', nexus=False):
         """Returns a numpy array when given a path to an HDF5 file.
 
         The data is assumed to be found in '/data' in the file.
@@ -81,8 +81,25 @@ class DataSlicerBase:
         Returns:
             numpy.array: A numpy array object for the data stored in the HDF5 file.
         """
+        
         with h5.File(path, 'r') as f:
-            data = f[hdf5_path][()]
+            if nexus:
+                try:
+                    data = f['processed/result/data'][()]
+                except KeyError:
+                    logging.error("NXS file: Couldn't find data at 'processed/result/data' trying another path.")
+                    try:
+                        data = f['entry/final_result_tomo/data'][()]
+                    except KeyError:
+                        print("NXS file: Could not find entry at entry/final_result_tomo/data, exiting!")
+                        sys.exit(1)
+            else:
+                data = f[hdf5_path][()]
+        # remove NaNs
+        logging.info("Calculating mean of data values.")
+        self.data_mean = np.nanmean(data)
+        logging.info(f"Mean is {self.data_mean}. Replacing NaN values.")
+        data = np.nan_to_num(data, copy=False, nan=self.data_mean)
         return data
 
     def clip_to_uint8(self, data):
@@ -96,11 +113,12 @@ class DataSlicerBase:
             np.array: A unit8 data array.
         """
         logging.info("Clipping data and converting to uint8.")
-        data_st_dev = np.std(data)
-        data_mean = np.mean(data)
-        num_vox = np.prod(data.shape)
-        lower_bound = data_mean - (data_st_dev * self.st_dev_factor)
-        upper_bound = data_mean + (data_st_dev * self.st_dev_factor)
+        logging.info(f"Mean value: {self.data_mean}. Calculating standard deviation.")
+        diff_mat = np.ravel(data - self.data_mean)
+        data_st_dev = np.sqrt(np.dot(diff_mat, diff_mat)/data.size)
+        num_vox = data.size
+        lower_bound = self.data_mean - (data_st_dev * self.st_dev_factor)
+        upper_bound = self.data_mean + (data_st_dev * self.st_dev_factor)
         gt_ub = (data > upper_bound).sum()
         lt_lb = (data < lower_bound).sum()
         logging.info(f"Lower bound: {lower_bound}, upper bound: {upper_bound}")
@@ -108,8 +126,11 @@ class DataSlicerBase:
             f"Number of voxels above upper bound to be clipped {gt_ub} - percentage {gt_ub/num_vox * 100:.3f}%")
         logging.info(
             f"Number of voxels below lower bound to be clipped {lt_lb} - percentage {lt_lb/num_vox * 100:.3f}%")
-        data = np.clip(data, lower_bound, upper_bound)
+        logging.info("Clipping image intensities.")
+        np.clip(data, lower_bound, upper_bound, out=data)
+        logging.info("Rescaling intensities.")
         data = exposure.rescale_intensity(data, out_range='float')
+        logging.info("Converting to uint8.")
         return img_as_ubyte(data)
 
     def get_axis_index_pairs(self, vol_shape):
@@ -173,9 +194,10 @@ class TrainingDataSlicer(DataSlicerBase):
     """
 
     def __init__(self, settings):
-        data_vol_path = getattr(settings, cfg.TRAIN_DATA_ARG)
+        data_vol_path = Path(getattr(settings, cfg.TRAIN_DATA_ARG))
+        nexus = data_vol_path.suffix == ".nxs"
         self.data_vol = self.numpy_from_hdf5(data_vol_path,
-                                          hdf5_path=settings.train_data_hdf5_path)
+                                          hdf5_path=settings.train_data_hdf5_path, nexus=nexus)
         super().__init__(settings)
         self.multilabel = False
         self.data_im_out_dir = None
@@ -202,8 +224,6 @@ class TrainingDataSlicer(DataSlicerBase):
         Args:
             seg_classes(list): An ascending list of the labels in the volume.
         """
-        if isinstance(self.seg_vol, da.core.Array):
-            self.seg_vol = self.seg_vol
         for idx, current in enumerate(seg_classes):
             self.seg_vol[self.seg_vol == current] = idx
 
@@ -309,9 +329,10 @@ class PredictionDataSlicer(DataSlicerBase):
     """
 
     def __init__(self, settings, predictor):
-        data_vol_path = getattr(settings, cfg.PREDICT_DATA_ARG)
+        data_vol_path = Path(getattr(settings, cfg.PREDICT_DATA_ARG))
+        nexus = data_vol_path.suffix == ".nxs"
         self.data_vol = self.numpy_from_hdf5(data_vol_path,
-                                          hdf5_path=settings.predict_data_hdf5_path)
+                                          hdf5_path=settings.predict_data_hdf5_path, nexus=nexus)
         self.data_vol_shape = self.data_vol.shape
         super().__init__(settings)
         self.consensus_vals = map(int, settings.consensus_vals)
