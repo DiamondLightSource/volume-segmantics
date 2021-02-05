@@ -200,9 +200,9 @@ class TrainingDataSlicer(DataSlicerBase):
     """
 
     def __init__(self, settings):
-        data_vol_path = Path(getattr(settings, cfg.TRAIN_DATA_ARG))
-        nexus = data_vol_path.suffix == ".nxs"
-        self.data_vol = self.numpy_from_hdf5(data_vol_path,
+        self.data_vol_path = Path(getattr(settings, cfg.TRAIN_DATA_ARG))
+        nexus = self.data_vol_path.suffix == ".nxs"
+        self.data_vol = self.numpy_from_hdf5(self.data_vol_path,
                                           hdf5_path=settings.train_data_hdf5_path, nexus=nexus)
         super().__init__(settings)
         self.multilabel = False
@@ -335,9 +335,9 @@ class PredictionDataSlicer(DataSlicerBase):
     """
 
     def __init__(self, settings, predictor):
-        data_vol_path = Path(getattr(settings, cfg.PREDICT_DATA_ARG))
-        nexus = data_vol_path.suffix == ".nxs"
-        self.data_vol = self.numpy_from_hdf5(data_vol_path,
+        self.data_vol_path = Path(getattr(settings, cfg.PREDICT_DATA_ARG))
+        nexus = self.data_vol_path.suffix == ".nxs"
+        self.data_vol = self.numpy_from_hdf5(self.data_vol_path,
                                           hdf5_path=settings.predict_data_hdf5_path, nexus=nexus)
         super().__init__(settings)
         self.consensus_vals = map(int, settings.consensus_vals)
@@ -628,7 +628,7 @@ class PredictionHDF5DataSlicer(PredictionDataSlicer):
             label_container[0, index] = label
         # Hacky output of first volume
         if k==0:
-            fastz_out_path = output_path.parent/"non_rot_z_single_plane_prediction.h5"
+            fastz_out_path = output_path.parent/f"{self.data_vol_path.stem}_1_plane_prediction.h5"
             logging.info(f"Saving single plane prediction to {fastz_out_path}")
             with h5.File(fastz_out_path, 'w') as f:
                     # Upsample segmentation if data has been downsampled
@@ -665,7 +665,7 @@ class PredictionHDF5DataSlicer(PredictionDataSlicer):
             f['/labels'] = label_container[0]
             f['/data'] = f['/labels']
         if k == 0:
-            fast3_vol_out_path = output_path.parent/"non_rot_3_plane_prediction.h5"
+            fast3_vol_out_path = output_path.parent/f"{self.data_vol_path.stem}_3_plane_prediction.h5"
             logging.info(f"Saving 3 plane prediction to {fast3_vol_out_path}")
             with h5.File(fast3_vol_out_path, 'w') as f:
                 # Upsample segmentation if data has been downsampled
@@ -707,9 +707,9 @@ class PredictionHDF5DataSlicer(PredictionDataSlicer):
 
         output_path = file_list[0].parent
         combined_label_out_path = output_path.parent / \
-                f'{date.today()}_12_volumes_combined.h5'
+                f"{self.data_vol_path.stem}_12_plane_prediction.h5"
         combined_prob_out_path = output_path.parent / \
-            f'{date.today()}_12_volumes_combined_probabilities.h5'
+            f"{self.data_vol_path.stem}_12_plane_prediction_probs.h5"
         logging.info("Merging final output data using maximum probabilties:")
         logging.info("Creating empty data volumes in RAM")
         label_container = np.empty((2, *self.data_vol_shape), dtype=np.uint8)

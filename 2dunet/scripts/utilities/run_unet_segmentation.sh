@@ -14,5 +14,5 @@ mkdir -p $output_folder
 cd $output_folder
 mkdir -p unet-settings; cp /dls_sw/apps/unet/DIAD/unet-segmentation/2dunet/scripts/settings/* unet-settings/.
 echo -e "\n *** Running 2dunet-prediction. ***\n"
-/dls_sw/apps/unet/conda_env/bin/python /dls_sw/apps/unet/repo/unet-segmentation/2dunet/scripts/predict_2d_unet_oo.py $model_path $input_data_path
+/dls_sw/apps/unet/conda_env/bin/python /dls_sw/apps/unet/DIAD/unet-segmentation/2dunet/scripts/predict_2d_unet_oo.py $model_path $input_data_path
 echo "Duration: $((($(date +%s)-$start)/60)) minutes"
