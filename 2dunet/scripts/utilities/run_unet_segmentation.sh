@@ -10,9 +10,9 @@ else
     echo "Not enough arguments -Usage: ./run_unet_segmentation.sh <path/to/model> <path/to/data> <path/to/ouput/dir>"
     exit 1
 fi
+mkdir -p $output_folder
 cd $output_folder
-module load unet/dev
-unet-setup #This copies settings into output dir
+mkdir -p unet-settings; cp /dls_sw/apps/unet/DIAD/unet-segmentation/2dunet/scripts/settings/* unet-settings/.
 echo -e "\n *** Running 2dunet-prediction. ***\n"
-2dunet-predict $model_path $input_data_path
+/dls_sw/apps/unet/conda_env/bin/python /dls_sw/apps/unet/repo/unet-segmentation/2dunet/scripts/predict_2d_unet_oo.py $model_path $input_data_path
 echo "Duration: $((($(date +%s)-$start)/60)) minutes"
