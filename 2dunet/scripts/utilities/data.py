@@ -18,6 +18,7 @@ import yaml
 from fastai.vision import Image, crop_pad, pil2tensor
 import torch
 from skimage import exposure, img_as_float, img_as_ubyte, io
+from skimage.measure import block_reduce
 from tqdm import tqdm
 
 from . import config as cfg
@@ -66,8 +67,19 @@ class DataSlicerBase:
 
     def __init__(self, settings):
         self.st_dev_factor = settings.st_dev_factor
+        self.downsample = settings.downsample
+        if self.downsample:
+            self.data_vol = self.downsample_data(self.data_vol)
+        self.data_mean = np.nanmean(self.data_vol)
+        self.data_vol_shape = self.data_vol.shape
+        logging.info(f"Replacing NaN values.")
+        self.data_vol = np.nan_to_num(self.data_vol, copy=False, nan=self.data_mean)
         if settings.normalise:
             self.data_vol = self.clip_to_uint8(self.data_vol)
+
+    def downsample_data(self, data, factor=2):
+        logging.info(f"Downsampling data by a factor of {factor}.")
+        return block_reduce(data, block_size=(factor, factor, factor), func=np.nanmean)
 
     def numpy_from_hdf5(self, path, hdf5_path='/data', nexus=False):
         """Returns a numpy array when given a path to an HDF5 file.
@@ -95,11 +107,6 @@ class DataSlicerBase:
                         sys.exit(1)
             else:
                 data = f[hdf5_path][()]
-        # remove NaNs
-        logging.info("Calculating mean of data values.")
-        self.data_mean = np.nanmean(data)
-        logging.info(f"Mean is {self.data_mean}. Replacing NaN values.")
-        data = np.nan_to_num(data, copy=False, nan=self.data_mean)
         return data
 
     def clip_to_uint8(self, data):
@@ -119,6 +126,7 @@ class DataSlicerBase:
         num_vox = data.size
         lower_bound = self.data_mean - (data_st_dev * self.st_dev_factor)
         upper_bound = self.data_mean + (data_st_dev * self.st_dev_factor)
+        logging.info("Calculating stats.")
         gt_ub = (data > upper_bound).sum()
         lt_lb = (data < lower_bound).sum()
         logging.info(f"Lower bound: {lower_bound}, upper bound: {upper_bound}")
@@ -126,10 +134,8 @@ class DataSlicerBase:
             f"Number of voxels above upper bound to be clipped {gt_ub} - percentage {gt_ub/num_vox * 100:.3f}%")
         logging.info(
             f"Number of voxels below lower bound to be clipped {lt_lb} - percentage {lt_lb/num_vox * 100:.3f}%")
-        logging.info("Clipping image intensities.")
-        np.clip(data, lower_bound, upper_bound, out=data)
         logging.info("Rescaling intensities.")
-        data = exposure.rescale_intensity(data, out_range='float')
+        data = exposure.rescale_intensity(data, in_range=(lower_bound, upper_bound), out_range='float')
         logging.info("Converting to uint8.")
         return img_as_ubyte(data)
 
@@ -333,7 +339,6 @@ class PredictionDataSlicer(DataSlicerBase):
         nexus = data_vol_path.suffix == ".nxs"
         self.data_vol = self.numpy_from_hdf5(data_vol_path,
                                           hdf5_path=settings.predict_data_hdf5_path, nexus=nexus)
-        self.data_vol_shape = self.data_vol.shape
         super().__init__(settings)
         self.consensus_vals = map(int, settings.consensus_vals)
         self.predictor = predictor
@@ -547,6 +552,7 @@ class PredictionHDF5DataSlicer(PredictionDataSlicer):
         logging.info(f"Using {self.__class__.__name__}")
         super().__init__(settings, predictor)
         self.output_probs = settings.output_probs
+        self.quality = settings.quality
 
     def create_target_hdf5_files(self, directory, shape_tup):
         for axis in ("z", "y", "x"):
@@ -620,6 +626,20 @@ class PredictionHDF5DataSlicer(PredictionDataSlicer):
                 self.axis_index_to_slice(data_arr, axis, index))
             prob_container[0, index] = prob
             label_container[0, index] = label
+        # Hacky output of first volume
+        if k==0:
+            fastz_out_path = output_path.parent/"non_rot_z_single_plane_prediction.h5"
+            logging.info(f"Saving single plane prediction to {fastz_out_path}")
+            with h5.File(fastz_out_path, 'w') as f:
+                    # Upsample segmentation if data has been downsampled
+                if self.downsample:
+                    f['/labels'] = self.upsample_segmentation(label_container[0])
+                else:
+                    f['/labels'] = label_container[0]
+                f['/data'] = f['/labels']
+            if self.quality == 'low':
+                logging.info("Quality set to low. Ending processing.")
+                sys.exit(0)
         logging.info("Predicting Y slices:")
         for axis, index in tqdm(y_ax_idx_pairs, total=shape_tup[1]):
             prob, label = self.predict_single_slice(
@@ -644,6 +664,20 @@ class PredictionHDF5DataSlicer(PredictionDataSlicer):
             f['/probabilities'] = prob_container[0]
             f['/labels'] = label_container[0]
             f['/data'] = f['/labels']
+        if k == 0:
+            fast3_vol_out_path = output_path.parent/"non_rot_3_plane_prediction.h5"
+            logging.info(f"Saving 3 plane prediction to {fast3_vol_out_path}")
+            with h5.File(fast3_vol_out_path, 'w') as f:
+                # Upsample segmentation if data has been downsampled
+                if self.downsample:
+                    f['/labels'] = self.upsample_segmentation(
+                        label_container[0])
+                else:
+                    f['/labels'] = label_container[0]
+                f['/data'] = f['/labels']
+            if self.quality == 'medium':
+                logging.info("Quality set to medium. Ending processing.")
+                sys.exit(0)
         return combined_out
 
     def merge_vols_in_mem(self, prob_container, label_container):
@@ -694,13 +728,29 @@ class PredictionHDF5DataSlicer(PredictionDataSlicer):
             self.merge_vols_in_mem(prob_container, label_container)
         logging.info(f"Saving final data out to: {combined_label_out_path}.")
         with h5.File(combined_label_out_path, 'w') as f:
-            f['/labels'] = label_container[0]
+            # Upsample segmentation if data has been downsampled
+            if self.downsample:
+                f['/labels'] = self.upsample_segmentation(label_container[0])
+            else:
+                f['/labels'] = label_container[0]
             f['/data'] = f['/labels']
         if self.output_probs:
             logging.info(f"Saving final probabilities out to: {combined_prob_out_path}.")
             with h5.File(combined_prob_out_path, 'w') as f:
                 f['/probabilities'] = prob_container[0]
                 f['/data'] = f['/probabilities']
+
+    def tile_array(self, a, b0, b1, b2):
+        """Fast method for upsampling a segmentation by repeating values.
+        Modified from https://stackoverflow.com/a/52341775"""
+        h, r, c = a.shape
+        out = np.empty((h, b0, r, b1, c, b2), a.dtype)
+        out[...] = a[:, None, :, None, :, None]
+        return out.reshape(h*b0, r*b1, c*b2)
+
+    def upsample_segmentation(self, data, factor=2):
+        logging.info(f"Upsampling segmentation by a factor of {factor}.")
+        return self.tile_array(data, factor, factor, factor)
 
     def predict_12_ways(self, root_path):
         """OVERRIDES METHOD IN PARENT CLASS.
