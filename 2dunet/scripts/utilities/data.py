@@ -70,12 +70,16 @@ class DataSlicerBase:
         self.downsample = settings.downsample
         if self.downsample:
             self.data_vol = self.downsample_data(self.data_vol)
-        self.data_mean = np.nanmean(self.data_vol)
         self.data_vol_shape = self.data_vol.shape
-        logging.info(f"Replacing NaN values.")
-        self.data_vol = np.nan_to_num(self.data_vol, copy=False, nan=self.data_mean)
+        logging.info("Calculating mean of data...")
+        self.data_mean = np.nanmean(self.data_vol)
+        logging.info(f"Mean value: {self.data_mean}")
         if settings.normalise:
             self.data_vol = self.clip_to_uint8(self.data_vol)
+        if np.isnan(self.data_vol).any():
+            logging.info(f"Replacing NaN values.")
+            self.data_vol = np.nan_to_num(self.data_vol, copy=False)
+        
 
     def downsample_data(self, data, factor=2):
         logging.info(f"Downsampling data by a factor of {factor}.")
@@ -120,21 +124,24 @@ class DataSlicerBase:
             np.array: A unit8 data array.
         """
         logging.info("Clipping data and converting to uint8.")
-        logging.info(f"Mean value: {self.data_mean}. Calculating standard deviation.")
-        diff_mat = np.ravel(data - self.data_mean)
-        data_st_dev = np.sqrt(np.dot(diff_mat, diff_mat)/data.size)
+        logging.info(f"Calculating standard deviation.")
+        data_st_dev = np.nanstd(data)
+        logging.info(f"Std dev: {data_st_dev}. Calculating stats.")
+        # diff_mat = np.ravel(data - self.data_mean)
+        # data_st_dev = np.sqrt(np.dot(diff_mat, diff_mat)/data.size)
         num_vox = data.size
         lower_bound = self.data_mean - (data_st_dev * self.st_dev_factor)
         upper_bound = self.data_mean + (data_st_dev * self.st_dev_factor)
-        logging.info("Calculating stats.")
-        gt_ub = (data > upper_bound).sum()
-        lt_lb = (data < lower_bound).sum()
+        with np.errstate(invalid='ignore'):
+            gt_ub = (data > upper_bound).sum()
+            lt_lb = (data < lower_bound).sum()
         logging.info(f"Lower bound: {lower_bound}, upper bound: {upper_bound}")
         logging.info(
             f"Number of voxels above upper bound to be clipped {gt_ub} - percentage {gt_ub/num_vox * 100:.3f}%")
         logging.info(
             f"Number of voxels below lower bound to be clipped {lt_lb} - percentage {lt_lb/num_vox * 100:.3f}%")
-        logging.info("Rescaling intensities.")
+        logging.info("Replacing NaNs and rescaling intensities.")
+        data = np.nan_to_num(data, copy=False, nan=self.data_mean)
         data = exposure.rescale_intensity(data, in_range=(lower_bound, upper_bound), out_range='float')
         logging.info("Converting to uint8.")
         return img_as_ubyte(data)
