@@ -134,11 +134,17 @@ def clip_to_uint8(data):
             f"Number of voxels above upper bound to be clipped {gt_ub} - percentage {gt_ub/data_size * 100:.3f}%")
         logging.info(
             f"Number of voxels below lower bound to be clipped {lt_lb} - percentage {lt_lb/data_size * 100:.3f}%")
-        logging.info("Replacing NaNs and rescaling intensities.")
-        data = np.nan_to_num(data, copy=False, nan=data_mean)
-        data = exposure.rescale_intensity(data, in_range=(lower_bound, upper_bound), out_range='float')
+        if np.isnan(data).any():
+            logging.info(f"Replacing NaN values.")
+            data = np.nan_to_num(data, copy=False, nan=data_mean)
+        logging.info("Rescaling intensities.")
+        data = np.clip(data, lower_bound, upper_bound, out=data)
+        data = np.subtract(data, lower_bound, out=data)
+        data = np.divide(data, (upper_bound - lower_bound), out=data)
+        data = np.clip(data, 0.0, 1.0, out=data)
         logging.info("Converting to uint8.")
-        return img_as_ubyte(data)
+        data = np.multiply(data, 255, out=data)
+        return data.astype(np.uint8)
 
 def check_coords(coords, data_shape, downsample):
     logging.info("Checking coordinates.")
