@@ -144,6 +144,9 @@ class DataSlicerBase:
             logging.info(f"Replacing NaN values.")
             data = np.nan_to_num(data, copy=False, nan=self.data_mean)
         logging.info("Rescaling intensities.")
+        if np.issubdtype(data.dtype, np.integer):
+            logging.info("Data is already in integer dtype, converting to float for rescaling.")
+            data = data.astype(np.float)
         data = np.clip(data, lower_bound, upper_bound, out=data)
         data = np.subtract(data, lower_bound, out=data)
         data = np.divide(data, (upper_bound - lower_bound), out=data)
