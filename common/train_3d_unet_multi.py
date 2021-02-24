@@ -17,7 +17,7 @@ import torch
 import torchio
 import yaml
 from matplotlib import pyplot as plt
-from pytorch3dunet.unet3d.losses import (BCEDiceLoss, DiceLoss,
+from pytorch3dunet.unet3d.losses import (BCEDiceLoss, DiceLoss, PixelWiseCrossEntropyLoss,
                                          GeneralizedDiceLoss)
 from pytorch3dunet.unet3d.metrics import GenericAveragePrecision, MeanIoU
 from pytorch3dunet.unet3d.model import ResidualUNet3D
@@ -70,9 +70,6 @@ BETA = settings_dict['beta']
 DEVICE_NUM = 0  # Once single GPU slected, default device will always be 0
 BAR_FORMAT = "{l_bar}{bar: 30}{r_bar}{bar: -30b}"  # tqdm progress bar
 
-multilabel = False
-
-
 def create_unet_on_device(device, model_dict):
     unet = ResidualUNet3D(**model_dict)
     print(f"Sending the model to device {CUDA_DEVICE}")
@@ -122,19 +119,17 @@ def numpy_from_hdf5(path, hdf5_path='/data', nexus=False, lazy=False):
 
 def prepare_batch(batch, device):
     inputs = batch['data'][DATA].to(device)
+    # if multilabel:
     targets = batch['label'][DATA]
-    if multilabel:
-        # Split the labels into channels - multilabel
-        targets = targets.squeeze()
-        channel_0 = torch.zeros_like(targets)
-        channel_1 = torch.zeros_like(targets)
-        channel_2 = torch.zeros_like(targets)
-        channel_0[targets == 0] = 1
-        channel_1[targets == 1] = 1
-        channel_2[targets == 2] = 1
-        targets = torch.stack((channel_0, channel_1, channel_2), 1).to(device, dtype=torch.uint8)
-    else:
-        targets.to(device)
+    # Split the labels into channels - multilabel
+    targets = targets.squeeze()
+    channels = []
+    for label_num in range(NUM_CLASSES):
+        channel = torch.zeros_like(targets)
+        channel[targets == label_num] = 1
+        channels.append(channel)
+    targets = torch.stack(channels, 1).to(
+        device, dtype=torch.uint8)
     return inputs, targets
 
 ############################################
@@ -171,7 +166,10 @@ def lr_finder(model, training_loader, optimizer, lr_scheduler,
             inputs, targets = prepare_batch(batch, DEVICE_NUM)
             optimizer.zero_grad()
             output = model(inputs)
-            loss = loss_criterion(output, targets)
+            if LOSS_CRITERION == 'PixelWiseCrossEntropyLoss':
+                loss = loss_criterion(output, targets, weights)
+            else:
+                loss = loss_criterion(output, targets)
             loss.backward()
             optimizer.step()
             lr_scheduler.step()
@@ -182,7 +180,8 @@ def lr_finder(model, training_loader, optimizer, lr_scheduler,
             else:
                 loss = smoothing * loss + (1 - smoothing) * lr_find_loss[-1]
                 lr_find_loss.append(loss)
-
+            if loss > 1:
+                break
             iters += 1
 
     if plt_fig:
@@ -302,7 +301,10 @@ def train_model(model, optimizer, lr_to_use, training_loader, valid_loader,
             # model
             output = model(inputs)
             # calculate the loss
-            loss = loss_criterion(output, targets)
+            if LOSS_CRITERION == 'PixelWiseCrossEntropyLoss':
+                loss = loss_criterion(output, targets, weights)
+            else:
+                loss = loss_criterion(output, targets)
             # backward pass: compute gradient of the loss with respect to model
             # parameters
             loss.backward()
@@ -325,7 +327,10 @@ def train_model(model, optimizer, lr_to_use, training_loader, valid_loader,
                 # the model
                 output = model(inputs)
                 # calculate the loss
-                loss = loss_criterion(output, targets)
+                if LOSS_CRITERION == 'PixelWiseCrossEntropyLoss':
+                    loss = loss_criterion(output, targets, weights)
+                else:
+                    loss = loss_criterion(output, targets)
                 # record validation loss
                 valid_losses.append(loss.item())
                 # if model contains final_activation layer for normalizing
@@ -464,24 +469,11 @@ def predict_validation_region(model, validation_dataset, validation_batch_size,
     predicted_vol = aggregator.get_output_tensor()  # output is 4D
     print(f"Shape of the predicted Volume is: {predicted_vol.shape}")
     predicted_vol = predicted_vol.numpy().squeeze()  # remove first dimension
-      # remove first dimension
-    if multilabel:
-        # do this if multichannel
-        predicted_vol = np.argmax(predicted_vol, axis=0)
+    predicted_vol = np.argmax(predicted_vol, axis=0)
     h5_out_path = data_path/f"{MODEL_OUT_FN[:-8]}_validation_vol_predicted.h5"
     print(f"Outputting prediction of the validation volume to {h5_out_path}")
     with h5.File(h5_out_path, 'w') as f:
         f['/data'] = predicted_vol.astype(np.uint8)
-    # Threshold if binary
-    if not multilabel:
-        predicted_vol[predicted_vol >= thresh_val] = 1
-        predicted_vol[predicted_vol < thresh_val] = 0
-        predicted_vol = predicted_vol.astype(np.uint8)
-        h5_out_path = data_path/f"{MODEL_OUT_FN[:-8]}_validation_vol_pred_thresh.h5"
-        print(f"Outputting prediction of the thresholded validation volume "
-            f"to {h5_out_path}")
-        with h5.File(h5_out_path, 'w') as f:
-            f['/data'] = predicted_vol
     plot_validation_slices(predicted_vol, data_path, MODEL_OUT_FN)
 
 
@@ -515,22 +507,18 @@ valid_data = numpy_from_hdf5(VALID_DATA)
 valid_seg = numpy_from_hdf5(VALID_SEG)
 
 seg_classes = np.unique(train_seg)
-num_seg_classes = len(seg_classes)
-assert(num_seg_classes > 1)
-if num_seg_classes > 2:
-    multilabel = True
+NUM_CLASSES = len(seg_classes)
+assert(NUM_CLASSES > 1)
 print("Number of classes in segmentation dataset:"
-      f" {num_seg_classes}")
+      f" {NUM_CLASSES}")
 print(f"These classes are: {seg_classes}")
 if (seg_classes[0] != 0) or is_not_consecutive(seg_classes):
     print("Fixing label classes.")
     fix_label_classes(train_seg, seg_classes)
     fix_label_classes(valid_seg, seg_classes)
+    print(f"Label classes {np.unique(train_seg)}")
 label_codes = [f"label_val_{i}" for i in seg_classes]
-if not multilabel:
-    MODEL_DICT['out_channels'] = 1
-else:
-    MODEL_DICT['out_channels'] = num_seg_classes
+MODEL_DICT['out_channels'] = NUM_CLASSES
 os.environ['CUDA_VISIBLE_DEVICES'] = CUDA_DEVICE
 unet = create_unet_on_device(DEVICE_NUM, MODEL_DICT)
 
@@ -543,13 +531,16 @@ if LOSS_CRITERION == 'BCEDiceLoss':
     loss_criterion = BCEDiceLoss(ALPHA, BETA)
 elif LOSS_CRITERION == 'DiceLoss':
     print("Using DiceLoss")
-    loss_criterion = DiceLoss()
+    loss_criterion = DiceLoss(sigmoid_normalization=False)
 elif LOSS_CRITERION == 'BCELoss':
     print("Using BCELoss")
     loss_criterion = nn.BCEWithLogitsLoss()
 elif LOSS_CRITERION == 'CrossEntropyLoss':
     print("Using CrossEntropyLoss")
     loss_criterion = nn.CrossEntropyLoss()
+elif LOSS_CRITERION == 'PixelWiseCrossEntropyLoss':
+    print("Using PixelWiseCrossEntropyLoss")
+    loss_criterion = PixelWiseCrossEntropyLoss()
 elif LOSS_CRITERION == 'GeneralizedDiceLoss':
     print("Using GeneralizedDiceLoss")
     loss_criterion = GeneralizedDiceLoss()
@@ -640,6 +631,8 @@ validation_loader = DataLoader(
 #############
 # Do things #
 #############
+if LOSS_CRITERION == 'PixelWiseCrossEntropyLoss':
+    weights = torch.ones((batch_size, NUM_CLASSES, *PATCH_SIZE)).to(DEVICE_NUM)
 # Create exponential learning rate scheduler
 lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
 lr_find_loss, lr_find_lr = lr_finder(
