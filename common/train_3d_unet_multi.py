@@ -17,7 +17,7 @@ import torch
 import torchio
 import yaml
 from matplotlib import pyplot as plt
-from pytorch3dunet.unet3d.losses import (BCEDiceLoss, DiceLoss, PixelWiseCrossEntropyLoss,
+from pytorch3dunet.unet3d.losses import (BCEDiceLoss, DiceLoss,
                                          GeneralizedDiceLoss)
 from pytorch3dunet.unet3d.metrics import GenericAveragePrecision, MeanIoU
 from pytorch3dunet.unet3d.model import ResidualUNet3D
@@ -35,7 +35,7 @@ from utilities.early_stopping import EarlyStopping
 real_path = os.path.realpath(__file__)
 dir_path = os.path.dirname(real_path)  # Extract the directory of the script
 settings_path = Path(dir_path, 'settings',
-                     '3d_unet_train_settings_multilabel.yaml')
+                     '3d_unet_train_settings_twolabel.yaml')
 print(f"Loading settings from {settings_path}")
 if settings_path.exists():
     with open(settings_path, 'r') as stream:
@@ -166,8 +166,8 @@ def lr_finder(model, training_loader, optimizer, lr_scheduler,
             inputs, targets = prepare_batch(batch, DEVICE_NUM)
             optimizer.zero_grad()
             output = model(inputs)
-            if LOSS_CRITERION == 'PixelWiseCrossEntropyLoss':
-                loss = loss_criterion(output, targets, weights)
+            if LOSS_CRITERION == 'CrossEntropyLoss':
+                loss = loss_criterion(output, torch.argmax(targets, dim=1))
             else:
                 loss = loss_criterion(output, targets)
             loss.backward()
@@ -180,7 +180,7 @@ def lr_finder(model, training_loader, optimizer, lr_scheduler,
             else:
                 loss = smoothing * loss + (1 - smoothing) * lr_find_loss[-1]
                 lr_find_loss.append(loss)
-            if loss > 1:
+            if loss > 1 and iters > len(training_loader)// 1.333:
                 break
             iters += 1
 
@@ -193,7 +193,7 @@ def lr_finder(model, training_loader, optimizer, lr_scheduler,
     return lr_find_loss, lr_find_lr
 
 
-def find_appropriate_lr(model, lr_find_loss, lr_find_lr, lr_diff=15,
+def find_appropriate_lr(model, lr_find_loss, lr_find_lr, lr_diff=6,
                         loss_threshold=.05, adjust_value=0.75):
     """Function taken from
     https://forums.fast.ai/t/automated-learning-rate-suggester/44199
@@ -277,7 +277,7 @@ def train_model(model, optimizer, lr_to_use, training_loader, valid_loader,
 
     # initialize the early_stopping object
     early_stopping = EarlyStopping(
-        patience=patience, verbose=True, path=output_path)
+        patience=patience, verbose=True, path=output_path, model_dict=MODEL_DICT)
     # Initialise the One Cycle learning rate scheduler
     lr_scheduler = (torch.optim.lr_scheduler
                     .OneCycleLR(optimizer, max_lr=lr_to_use,
@@ -301,8 +301,8 @@ def train_model(model, optimizer, lr_to_use, training_loader, valid_loader,
             # model
             output = model(inputs)
             # calculate the loss
-            if LOSS_CRITERION == 'PixelWiseCrossEntropyLoss':
-                loss = loss_criterion(output, targets, weights)
+            if LOSS_CRITERION == 'CrossEntropyLoss':
+                loss = loss_criterion(output, torch.argmax(targets, dim=1))
             else:
                 loss = loss_criterion(output, targets)
             # backward pass: compute gradient of the loss with respect to model
@@ -327,19 +327,21 @@ def train_model(model, optimizer, lr_to_use, training_loader, valid_loader,
                 # the model
                 output = model(inputs)
                 # calculate the loss
-                if LOSS_CRITERION == 'PixelWiseCrossEntropyLoss':
-                    loss = loss_criterion(output, targets, weights)
+                if LOSS_CRITERION == 'CrossEntropyLoss':
+                    loss = loss_criterion(output, torch.argmax(targets, dim=1))
                 else:
                     loss = loss_criterion(output, targets)
                 # record validation loss
                 valid_losses.append(loss.item())
-                # if model contains final_activation layer for normalizing
-                # logits apply it, otherwise the evaluation metric will be
-                # incorrectly computed
-                if (hasattr(model, 'final_activation')
-                        and model.final_activation is not None):
-                    output = model.final_activation(output)
-                eval_score = eval_criterion(output, targets)
+                # # if model contains final_activation layer for normalizing
+                # # logits apply it, otherwise the evaluation metric will be
+                # # incorrectly computed
+                # if (hasattr(model, 'final_activation')
+                #         and model.final_activation is not None):
+                #     output = model.final_activation(output)
+                s_max = nn.Softmax(dim=1)
+                probs = s_max(output)
+                eval_score = eval_criterion(probs, targets)
                 eval_scores.append(eval_score)
 
         toc = time.perf_counter()
@@ -369,7 +371,8 @@ def train_model(model, optimizer, lr_to_use, training_loader, valid_loader,
             break
 
     # load the last checkpoint with the best model
-    model.load_state_dict(torch.load(output_path))
+    model_dict = torch.load(output_path, map_location='cpu')
+    model.load_state_dict(model_dict['model_state_dict'])
 
     return model, avg_train_losses, avg_valid_losses, avg_eval_scores
 
@@ -460,12 +463,9 @@ def predict_validation_region(model, validation_dataset, validation_batch_size,
             inputs = patches_batch['data'][DATA].to(DEVICE_NUM)
             locations = patches_batch[torchio.LOCATION]
             logits = model(inputs)
-            if (hasattr(model, 'final_activation')
-                    and model.final_activation is not None):
-                logits = model.final_activation(logits)
-            aggregator.add_batch(logits, locations)
-            
-
+            s_max = nn.Softmax(dim=1)
+            probs = s_max(logits)
+            aggregator.add_batch(probs, locations)
     predicted_vol = aggregator.get_output_tensor()  # output is 4D
     print(f"Shape of the predicted Volume is: {predicted_vol.shape}")
     predicted_vol = predicted_vol.numpy().squeeze()  # remove first dimension
@@ -518,9 +518,6 @@ if (seg_classes[0] != 0) or is_not_consecutive(seg_classes):
     fix_label_classes(valid_seg, seg_classes)
     print(f"Label classes {np.unique(train_seg)}")
 label_codes = [f"label_val_{i}" for i in seg_classes]
-MODEL_DICT['out_channels'] = NUM_CLASSES
-os.environ['CUDA_VISIBLE_DEVICES'] = CUDA_DEVICE
-unet = create_unet_on_device(DEVICE_NUM, MODEL_DICT)
 
 # Get the loss function - TODO make this changeable according to number of
 # classes in segmentation
@@ -538,9 +535,6 @@ elif LOSS_CRITERION == 'BCELoss':
 elif LOSS_CRITERION == 'CrossEntropyLoss':
     print("Using CrossEntropyLoss")
     loss_criterion = nn.CrossEntropyLoss()
-elif LOSS_CRITERION == 'PixelWiseCrossEntropyLoss':
-    print("Using PixelWiseCrossEntropyLoss")
-    loss_criterion = PixelWiseCrossEntropyLoss()
 elif LOSS_CRITERION == 'GeneralizedDiceLoss':
     print("Using GeneralizedDiceLoss")
     loss_criterion = GeneralizedDiceLoss()
@@ -557,7 +551,10 @@ elif EVAL_METRIC == "GenericAveragePrecision":
 else:
     print("No evaluation metric specified, exiting")
     sys.exit(1)
-# Create optimizer
+# Create model and optimizer
+MODEL_DICT['out_channels'] = NUM_CLASSES
+os.environ['CUDA_VISIBLE_DEVICES'] = CUDA_DEVICE
+unet = create_unet_on_device(DEVICE_NUM, MODEL_DICT)
 optimizer = torch.optim.AdamW(unet.parameters(), lr=STARTING_LR)
 
 train_subject = torchio.Subject(
@@ -631,8 +628,6 @@ validation_loader = DataLoader(
 #############
 # Do things #
 #############
-if LOSS_CRITERION == 'PixelWiseCrossEntropyLoss':
-    weights = torch.ones((batch_size, NUM_CLASSES, *PATCH_SIZE)).to(DEVICE_NUM)
 # Create exponential learning rate scheduler
 lr_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
 lr_find_loss, lr_find_lr = lr_finder(

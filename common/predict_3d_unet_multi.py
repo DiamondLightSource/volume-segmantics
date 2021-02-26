@@ -10,13 +10,14 @@ import torchio
 import yaml
 from matplotlib import pyplot as plt
 from pytorch3dunet.unet3d.model import ResidualUNet3D
+from torch import nn as nn
 from torch.utils.data import DataLoader
 from torchio.data.inference import GridSampler
 from tqdm import tqdm
 
 real_path = os.path.realpath(__file__)
 dir_path = os.path.dirname(real_path)  # Extract the directory of the script
-settings_path = Path(dir_path, 'settings', '3d_unet_predict_settings_multi.yaml')
+settings_path = Path(dir_path, 'settings', '3d_unet_predict_settings_twolabel.yaml')
 print(f"Loading settings from {settings_path}")
 if settings_path.exists():
     with open(settings_path, 'r') as stream:
@@ -36,8 +37,6 @@ HDF5_PATH = settings_dict['hdf5_path']
 PATCH_SIZE = tuple(settings_dict['patch_size'])
 PATCH_OVERLAP = settings_dict['patch_overlap']
 PADDING_MODE = settings_dict['padding_mode']
-MODEL_DICT = settings_dict['model']
-THRESH_VAL = settings_dict['thresh_val']
 DATA = 'data'
 DEVICE_NUM = 0  # Once single GPU slected, default device will always be 0
 BAR_FORMAT = "{l_bar}{bar: 30}{r_bar}{bar: -30b}"  # tqdm progress bar
@@ -87,8 +86,7 @@ def plot_predict_figure(predicted_vol, data_tens, data_path):
     plt.savefig(plt_out_pth, dpi=150)
 
 
-def predict_volume(model, grid_sampler, batch_size,
-                   thresh_val, data_path):
+def predict_volume(model, grid_sampler, batch_size, data_path):
 
     patch_loader = DataLoader(
         grid_sampler, batch_size=batch_size)
@@ -101,17 +99,12 @@ def predict_volume(model, grid_sampler, batch_size,
             inputs = patches_batch[DATA][DATA].to(DEVICE_NUM)
             locations = patches_batch[torchio.LOCATION]
             logits = model(inputs)
-            if (hasattr(model, 'final_activation')
-                    and model.final_activation is not None):
-                logits = model.final_activation(logits)
-            aggregator.add_batch(logits, locations)
+            s_max = nn.Softmax(dim=1)
+            probs = s_max(logits)
+            aggregator.add_batch(probs, locations)
 
     predicted_vol = aggregator.get_output_tensor()  # output is 4D
     predicted_vol = predicted_vol.numpy().squeeze()  # remove first dimension
-    # Threshold
-    # predicted_vol[predicted_vol >= thresh_val] = 1
-    # predicted_vol[predicted_vol < thresh_val] = 0
-    # predicted_vol = predicted_vol.astype(np.uint8)
     predicted_vol = np.argmax(predicted_vol, axis=0) # flatten channels
     print(f"Outputting prediction of the validation volume to {data_path}")
     with h5.File(data_path, 'w') as f:
@@ -125,17 +118,18 @@ allocated_gpu_mem = torch.cuda.memory_allocated(DEVICE_NUM)
 free_gpu_mem = (total_gpu_mem - allocated_gpu_mem) / 1024**3  # free
 
 if free_gpu_mem < 30:
-    batch_size = 4  # Set to 4 for 16Gb Card
+    batch_size = 2  # Set to 4 for 16Gb Card
 else:
-    batch_size = 8  # Set to 4 for 32Gb Card
+    batch_size = 3  # Set to 4 for 32Gb Card
 print(f"Patch size is {PATCH_SIZE}")
 print(f"Free GPU memory is {free_gpu_mem:0.2f} GB. Batch size will be "
       f"{batch_size}.")
 
 # Load model
 print(f"Loading model from {MODEL_FILE}")
-unet = create_unet_on_device(DEVICE_NUM, MODEL_DICT)
-unet.load_state_dict(torch.load(MODEL_FILE))
+model_dict = torch.load(MODEL_FILE, map_location='cpu')
+unet = create_unet_on_device(DEVICE_NUM, model_dict['model_struc_dict'])
+unet.load_state_dict(model_dict['model_state_dict'])
 # Load the data and create a sampler
 print(f"Loading data from {DATA_FILE}")
 data_tens = tensor_from_hdf5(DATA_FILE, HDF5_PATH)
@@ -151,8 +145,7 @@ grid_sampler = GridSampler(
     padding_mode=PADDING_MODE
 )
 
-pred_vol = predict_volume(unet, grid_sampler, batch_size,
-                          THRESH_VAL, DATA_OUT_FN)
+pred_vol = predict_volume(unet, grid_sampler, batch_size, DATA_OUT_FN)
 fig_out_dir = DATA_OUT_DIR/f'{date.today()}_3d_prediction_figs'
 print(f"Creating directory for figures: {fig_out_dir}")
 os.makedirs(fig_out_dir, exist_ok=True)
