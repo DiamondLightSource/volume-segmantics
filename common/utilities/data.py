@@ -15,7 +15,7 @@ import dask.array as da
 import h5py as h5
 import numpy as np
 import yaml
-from fastai.vision import Image, crop_pad, pil2tensor
+#from fastai.vision import Image, crop_pad, pil2tensor
 import torch
 from skimage import exposure, img_as_float, img_as_ubyte, io
 from skimage.measure import block_reduce
@@ -261,6 +261,12 @@ class TrainingDataSampler(DataSlicerBase):
             self.fix_label_classes(self.seg_val_vol, seg_classes)
         self.create_volume_data_loaders(settings)
 
+    def get_training_loader(self):
+        return self.training_loader
+    
+    def get_validation_loader(self):
+        return self.validation_loader
+
     def load_in_vol(self, settings, data_path):
         load_path = Path(getattr(settings, data_path))
         nexus = load_path.suffix == ".nxs"
@@ -325,7 +331,7 @@ class TrainingDataSampler(DataSlicerBase):
         if free_gpu_mem < 30:
             batch_size = 2  # Set to 2 for 16Gb Card
         else:
-            batch_size = 2  # Set to 4 for 32Gb Card
+            batch_size = 3  # Set to 4 for 32Gb Card
         print(f"Patch size is {tuple(settings.patch_size)}")
         print(f"Free GPU memory is {free_gpu_mem:0.2f} GB. Batch size will be "
             f"{batch_size}.")

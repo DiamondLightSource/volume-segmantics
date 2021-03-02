@@ -9,7 +9,7 @@ from pathlib import Path
 from utilities import config as cfg
 from utilities.cmdline import CheckExt
 from utilities.data import SettingsData, TrainingDataSampler
-from utilities.unet2d import Unet2dTrainer
+from utilities.unet3d import Unet3dTrainer
 
 
 def init_argparse() -> argparse.ArgumentParser:
@@ -73,15 +73,11 @@ if __name__ == "__main__":
     os.environ["CUDA_VISIBLE_DEVICES"] = str(settings.cuda_device)
     # Set up the DataSampler to load in the data
     sampler = TrainingDataSampler(settings)
-    # # Set up the UnetTrainer
-    # trainer = Unet2dTrainer(data_im_out_dir, seg_im_out_dir, slicer.codes, settings)
+
+    model_fn = f"{date.today()}_{settings.model_output_fn}.pytorch"
+    model_out = Path(root_path, model_fn)
+    # Set up the UnetTrainer
+    trainer = Unet3dTrainer(sampler, settings)
     # # Train the model
-    # trainer.train_model()
-    # # Save the model
-    # model_fn = f"{date.today()}_{settings.model_output_fn}"
-    # model_out = Path(root_path, model_fn)
-    # trainer.save_model_weights(model_out)
-    # # Save a figure showing the predictions
-    # trainer.output_prediction_figure(model_out)
-    # # Clean up all the saved slices
-    # slicer.clean_up_slices()
+    trainer.train_model(model_out, settings.num_epochs, settings.patience)
+    trainer.output_loss_fig(model_out)
