@@ -2,13 +2,13 @@
 # -------------------------------
 cuda_device: 3 # The graphics card to use (between 0 and 3 for a machine with 4 GPUs)
 model_output_fn: trained3dUnet_model # Suffix for the saved U-net model filename
-normalise: false # Rescale the image intensities and rescale to uint8 before training
+normalise: False # Rescale the image intensities and rescale to uint8 before training
 st_dev_factor: 2.575 # The number of standard deviations from the mean to clip data to
-train_data_hdf5_path: /data # The internal HDF5 path to the image data
-seg_hdf5_path: /data # The internal HDF5 path to the label data
+hdf5_path: /data # The internal HDF5 path to the image data
+downsample: False # If True, data will be downsampled by 2
 # Training parameters
-num_epochs: 10 # Maximum number of epochs for training
-patience: 4 # Number of epoch to wait before early stopping if validation loss does not improve
+num_epochs: 2 # Maximum number of epochs for training
+patience: 1 # Number of epoch to wait before early stopping if validation loss does not improve
 loss_criterion: DiceLoss # Choose from one of [BCEDiceLoss, BCELoss, DiceLoss, GeneralizedDiceLoss, CrossEntropyLoss]
 alpha: 0.75 # When BCEDiceLoss selected, weighting for BCELoss
 beta: 0.25 # When BCEDiceLoss selected, weighting for DiceLoss
@@ -16,6 +16,7 @@ eval_metric: MeanIoU # Choose from one of [MeanIoU, GenericAveragePrecision]
 # Parameters for generating training patches
 patch_size:
   [128, 128, 128]
+patch_overlap: 32 # Only used when providing prediction of validation volume
 train_patches: 48 # Number of patches to sample from the training volume
 valid_patches: 12 # Number of patches to sample from the validation volume
 max_queue_length: 48 # Maximum queue of pathches to create (the larger the number the more RAM required)

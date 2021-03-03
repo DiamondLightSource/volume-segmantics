@@ -354,34 +354,32 @@ class Unet3dTrainer:
             for row in rows:
                 writer.writerow(row)
 
-    # def predict_validation_region(self, data_path):
-    #     sample = validation_dataset[0]
-    #     patch_overlap = 32
-    #     grid_sampler = GridSampler(
-    #         sample,
-    #         PATCH_SIZE,
-    #         patch_overlap,
-    #         padding_mode='reflect'
-    #     )
-    #     patch_loader = DataLoader(
-    #         grid_sampler, batch_size=validation_batch_size)
-    #     aggregator = torchio.data.inference.GridAggregator(grid_sampler)
 
-    #     model.eval()
-    #     with torch.no_grad():
-    #         for patches_batch in patch_loader:
-    #             inputs = patches_batch['data'][DATA].to(DEVICE_NUM)
-    #             locations = patches_batch[torchio.LOCATION]
-    #             logits = model(inputs)
-    #             s_max = nn.Softmax(dim=1)
-    #             probs = s_max(logits)
-    #             aggregator.add_batch(probs, locations)
-    #     predicted_vol = aggregator.get_output_tensor()  # output is 4D
-    #     print(f"Shape of the predicted Volume is: {predicted_vol.shape}")
-    #     predicted_vol = predicted_vol.numpy().squeeze()  # remove first dimension
-    #     predicted_vol = np.argmax(predicted_vol, axis=0)
-    #     h5_out_path = data_path/f"{MODEL_OUT_FN[:-8]}_validation_vol_predicted.h5"
-    #     print(f"Outputting prediction of the validation volume to {h5_out_path}")
-    #     with h5.File(h5_out_path, 'w') as f:
-    #         f['/data'] = predicted_vol.astype(np.uint8)
-    #     plot_validation_slices(predicted_vol, data_path, MODEL_OUT_FN)
+class Unet3dPredictor:
+
+    def __init__(self, sampler, settings):
+        self.settings = settings
+        # Params for learning rate finder
+        self.lr_find_lr_diff = 7
+        self.lr_find_loss_threshold = 0.05
+        self.lr_find_adjust_value = 1
+        self.starting_lr = float(settings.starting_lr)
+        self.end_lr = float(settings.end_lr)
+        self.log_lr_ratio = math.log(self.end_lr / self.starting_lr)
+        self.lr_find_epochs = settings.lr_find_epochs
+        # Params for model training
+        self.num_epochs = settings.num_epochs
+        self.patience = settings.patience
+        self.loss_criterion = self.get_loss_criterion()
+        self.eval_metric = self.get_eval_metric()
+        self.model_struc_dict = settings.model
+        self.model_struc_dict["out_channels"] = sampler.num_seg_classes
+        # Get Data loaders
+        self.training_loader = sampler.get_training_loader()
+        self.validation_loader = sampler.get_validation_loader()
+        # Set up model ready for training
+        logging.info(f"Setting up the model on device {settings.cuda_device}.")
+        self.model = self.create_unet_on_device(DEVICE_NUM, self.model_struc_dict)
+        self.optimizer = self.create_optimizer(self.starting_lr)
+        logging.info("Trainer created.")
+

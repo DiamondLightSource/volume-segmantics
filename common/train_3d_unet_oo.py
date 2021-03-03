@@ -8,7 +8,8 @@ from pathlib import Path
 
 from utilities import config as cfg
 from utilities.cmdline import CheckExt
-from utilities.data import SettingsData, TrainingDataSampler
+from utilities.data_utils_base import SettingsData
+from utilities.data_utils_3d import TrainingData3dSampler
 from utilities.unet3d import Unet3dTrainer
 
 
@@ -72,12 +73,20 @@ if __name__ == "__main__":
     # Set the CUDA device
     os.environ["CUDA_VISIBLE_DEVICES"] = str(settings.cuda_device)
     # Set up the DataSampler to load in the data
-    sampler = TrainingDataSampler(settings)
-
-    model_fn = f"{date.today()}_{settings.model_output_fn}.pytorch"
-    model_out = Path(root_path, model_fn)
+    sampler = TrainingData3dSampler(settings)
     # Set up the UnetTrainer
     trainer = Unet3dTrainer(sampler, settings)
     # # Train the model
+    model_fn = f"{date.today()}_{settings.model_output_fn}.pytorch"
+    model_out = Path(root_path, model_fn)
     trainer.train_model(model_out, settings.num_epochs, settings.patience)
     trainer.output_loss_fig(model_out)
+    # Predict a segmentation for the validation region
+    valid_out_fn = f"{date.today()}_{settings.model_output_fn}_validation_prediction.h5"
+    valid_out_pth = Path(root_path, valid_out_fn)
+    validation_prediction = sampler.predict_volume(trainer.model, sampler.data_val_vol, valid_out_pth)
+    # Output a figure with data and prediction images
+    fig_out_fn = f"{date.today()}_{settings.model_output_fn}_prediction_output.png"
+    fig_out_pth = Path(root_path, fig_out_fn)
+    sampler.plot_predict_figure(sampler.seg_val_vol, validation_prediction, fig_out_pth, validation=True)
+
