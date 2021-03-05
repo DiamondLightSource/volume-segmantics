@@ -35,7 +35,13 @@ DEVICE_NUM = 0
 BAR_FORMAT = "{l_bar}{bar: 30}{r_bar}{bar: -30b}"  # tqdm progress bar
 
 
-class Unet3dTrainer:
+class BaseUnet3dUtility:
+    def create_unet_on_device(self, device_num, model_struc_dict):
+        unet = ResidualUNet3D(**model_struc_dict)
+        return unet.to(device_num)
+
+
+class Unet3dTrainer(BaseUnet3dUtility):
     """Class that utlises 3d dataloaders to train a 3d Unet.
 
     Args:
@@ -107,10 +113,6 @@ class Unet3dTrainer:
             logging.error("No evaluation metric specified, exiting")
             sys.exit(1)
         return eval_metric
-
-    def create_unet_on_device(self, device_num, model_struc_dict):
-        unet = ResidualUNet3D(**model_struc_dict)
-        return unet.to(device_num)
 
     def create_optimizer(self, learning_rate):
         return torch.optim.AdamW(self.model.parameters(), lr=learning_rate)
@@ -327,59 +329,67 @@ class Unet3dTrainer:
         self.model.load_state_dict(model_dict["model_state_dict"])
 
     def output_loss_fig(self, model_out_path):
-        
+
         fig = plt.figure(figsize=(10, 8))
-        plt.plot(range(1, len(self.avg_train_losses)+1), self.avg_train_losses, label='Training Loss')
-        plt.plot(range(1, len(self.avg_valid_losses)+1), self.avg_valid_losses, label='Validation Loss')
+        plt.plot(
+            range(1, len(self.avg_train_losses) + 1),
+            self.avg_train_losses,
+            label="Training Loss",
+        )
+        plt.plot(
+            range(1, len(self.avg_valid_losses) + 1),
+            self.avg_valid_losses,
+            label="Validation Loss",
+        )
 
-        minposs = self.avg_valid_losses.index(min(self.avg_valid_losses))+1 # find position of lowest validation loss
-        plt.axvline(minposs, linestyle='--', color='r',
-                    label='Early Stopping Checkpoint')
+        minposs = (
+            self.avg_valid_losses.index(min(self.avg_valid_losses)) + 1
+        )  # find position of lowest validation loss
+        plt.axvline(
+            minposs, linestyle="--", color="r", label="Early Stopping Checkpoint"
+        )
 
-        plt.xlabel('epochs')
-        plt.ylabel('loss')
-        plt.xlim(0, len(self.avg_train_losses)+1)  # consistent scale
+        plt.xlabel("epochs")
+        plt.ylabel("loss")
+        plt.xlim(0, len(self.avg_train_losses) + 1)  # consistent scale
         plt.grid(True)
         plt.legend()
         plt.tight_layout()
         fig_out_pth = f"{model_out_path.stem}_loss_plot.png"
         logging.info(f"Saving figure of training/validation losses to {fig_out_pth}")
-        fig.savefig(fig_out_pth, bbox_inches='tight')
+        fig.savefig(fig_out_pth, bbox_inches="tight")
         # Output a list of training stats
         epoch_lst = range(len(self.avg_train_losses))
-        rows = zip(epoch_lst, self.avg_train_losses, self.avg_valid_losses, self.avg_eval_scores)
-        with open(f"{model_out_path.stem}_train_stats.csv", 'w') as f:
+        rows = zip(
+            epoch_lst,
+            self.avg_train_losses,
+            self.avg_valid_losses,
+            self.avg_eval_scores,
+        )
+        with open(f"{model_out_path.stem}_train_stats.csv", "w") as f:
             writer = csv.writer(f)
-            writer.writerow(('Epoch', 'Train Loss', 'Valid Loss', 'Eval Score'))
+            writer.writerow(("Epoch", "Train Loss", "Valid Loss", "Eval Score"))
             for row in rows:
                 writer.writerow(row)
 
 
-class Unet3dPredictor:
+class Unet3dPredictor(BaseUnet3dUtility):
+    """Class that can either load in pytorch 3d Unet model weights or take an
+    instance of a trained 3d Unet model.
+    """
 
-    def __init__(self, sampler, settings):
-        self.settings = settings
-        # Params for learning rate finder
-        self.lr_find_lr_diff = 7
-        self.lr_find_loss_threshold = 0.05
-        self.lr_find_adjust_value = 1
-        self.starting_lr = float(settings.starting_lr)
-        self.end_lr = float(settings.end_lr)
-        self.log_lr_ratio = math.log(self.end_lr / self.starting_lr)
-        self.lr_find_epochs = settings.lr_find_epochs
-        # Params for model training
-        self.num_epochs = settings.num_epochs
-        self.patience = settings.patience
-        self.loss_criterion = self.get_loss_criterion()
-        self.eval_metric = self.get_eval_metric()
-        self.model_struc_dict = settings.model
-        self.model_struc_dict["out_channels"] = sampler.num_seg_classes
-        # Get Data loaders
-        self.training_loader = sampler.get_training_loader()
-        self.validation_loader = sampler.get_validation_loader()
-        # Set up model ready for training
-        logging.info(f"Setting up the model on device {settings.cuda_device}.")
-        self.model = self.create_unet_on_device(DEVICE_NUM, self.model_struc_dict)
-        self.optimizer = self.create_optimizer(self.starting_lr)
-        logging.info("Trainer created.")
+    def get_model_from_trainer(self, trainer):
+        self.model = trainer.model
 
+    def create_model_from_file(self, weights_fn):
+        """Creates a deep learning model and stores it as
+        an instance attribute.
+        """
+        weights_fn = weights_fn.resolve()
+        logging.info("Loading 3d U-net model for prediction.")
+        model_dict = torch.load(weights_fn, map_location="cpu")
+        self.model = self.create_unet_on_device(
+            DEVICE_NUM, model_dict["model_struc_dict"]
+        )
+        logging.info("Loading in the saved weights.")
+        self.model.load_state_dict(model_dict["model_state_dict"])

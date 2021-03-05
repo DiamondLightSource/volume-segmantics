@@ -227,3 +227,8 @@ class TrainingData3dSampler(Base3dSampler):
         self.validation_loader = DataLoader(
             patches_validation_set, batch_size=batch_size
         )
+
+class PredictionData3dSampler(Base3dSampler):
+    def __init__(self, settings, predictor):
+        super().__init__(settings)
+        self.data_vol = self.load_in_vol(settings, cfg.PREDICT_DATA_ARG)
