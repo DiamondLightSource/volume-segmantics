@@ -10,7 +10,7 @@ PREDICT_DATA_ARG = "predict_data_path"
 # File extensions
 TRAIN_DATA_EXT = {"h5", "hdf5", "nxs"}
 LABEL_DATA_EXT = {"h5", "hdf5"}
-MODEL_DATA_EXT = {"zip"}
+MODEL_DATA_EXT = {"zip", "pytorch", "pth"}
 PREDICT_DATA_EXT = {"h5", "hdf5", "nxs"}
 # TODO Required settings - check required keys are in settings files
 # Logging format
