@@ -20,7 +20,7 @@ def init_argparse() -> argparse.ArgumentParser:
         command line args contained within.
     """
     parser = argparse.ArgumentParser(
-        usage="%(prog)s --data <path(s)/to/data/file(s).h5> --labels <path(s)/to/segmentation/file(s).h5>",
+        usage="%(prog)s --data <path(s)/to/data/file(s)> --labels <path(s)/to/segmentation/file(s)> --data_dir path/to/data_directory",
         description="Train a 2d U-net model on the 3d data and corresponding"
         " segmentation provided in the files."
     )
@@ -28,26 +28,29 @@ def init_argparse() -> argparse.ArgumentParser:
         "-v", "--version", action="version",
         version=f"{parser.prog} version 1.0.0"
     )
-    parser.add_argument("--" + cfg.TRAIN_DATA_ARG, metavar='Path to training image data volume', type=str,
+    parser.add_argument("--" + cfg.TRAIN_DATA_ARG, metavar='Path(s) to training image data volume(s)', type=str,
                         action=CheckExt(cfg.TRAIN_DATA_EXT),
                         nargs="+", required=True,
-                        help='the path to an HDF5 file containing the imaging data volume for training')
-    parser.add_argument("--" + cfg.LABEL_DATA_ARG, metavar='Path to label volume', type=str,
+                        help='the path(s) to file(s) containing the imaging data volume for training')
+    parser.add_argument("--" + cfg.LABEL_DATA_ARG, metavar='Path(s) to label volume(s)', type=str,
                         action=CheckExt(cfg.LABEL_DATA_EXT),
                         nargs="+", required=True,
-                        help='the path to an HDF5 file containing a segmented volume for training')
+                        help='the path(s) to file(s) containing a segmented volume for training')
+    parser.add_argument("--" + cfg.DATA_DIR_ARG, metavar='Path to settings and output directory', type=str,
+                        nargs="+", required=True,
+                        help='the path to a directory containing the "unet-settings", data will be output to this location')
     return parser
 
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO, format=cfg.LOGGING_FMT,
         datefmt=cfg.LOGGING_DATE_FMT)
-    root_path = Path.cwd()  # For module load script, use the CWD
     # Parse args and check correct numer of volumes given
     parser = init_argparse()
     args = parser.parse_args()
     data_vols = getattr(args, cfg.TRAIN_DATA_ARG)
     label_vols = getattr(args, cfg.LABEL_DATA_ARG)
+    root_path = Path(getattr(args, cfg.DATA_DIR_ARG)[0]).resolve() 
     if len(data_vols) != len(label_vols):
         logging.error("Number of data volumes and number of label volumes must be equal!")
         sys.exit(1)

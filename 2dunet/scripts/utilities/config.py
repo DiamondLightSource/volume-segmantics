@@ -5,6 +5,7 @@ TRAIN_DATA_ARG = "data"
 LABEL_DATA_ARG = "labels"
 MODEL_PTH_ARG = "model"
 PREDICT_DATA_ARG = "data"
+DATA_DIR_ARG = "data_dir"
 # File extensions
 TIFF_SUFFIXES = {".tiff", ".tif"}
 HDF5_SUFFIXES = {".h5", ".hdf5", ".nxs"}

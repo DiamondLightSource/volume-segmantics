@@ -23,7 +23,7 @@ def init_argparse() -> argparse.ArgumentParser:
         command line args contained within.
     """
     parser = argparse.ArgumentParser(
-        usage="%(prog)s [path/to/model/file.zip] [path/to/data/file.h5]",
+        usage="%(prog)s path/to/model/file.zip path/to/data/file path/to/data_directory",
         description="Predict segmentation of a 3d data volume using the 2d"
         " model provided."
     )
@@ -37,16 +37,19 @@ def init_argparse() -> argparse.ArgumentParser:
     parser.add_argument(cfg.PREDICT_DATA_ARG, metavar='Path to prediction data volume', type=str,
                         action=CheckExt(cfg.PREDICT_DATA_EXT), nargs="+",
                         help='the path to an HDF5 file containing the imaging data to segment')
+    parser.add_argument(cfg.DATA_DIR_ARG, metavar='Path to settings and output directory', type=str,
+                        nargs="+",
+                        help='the path to a directory containing the "unet-settings", data will be output to this location')
     return parser
 
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO, format=cfg.LOGGING_FMT,
         datefmt=cfg.LOGGING_DATE_FMT)
-    root_path = Path.cwd()  # For module load script, use the CWD
     # Set up the settings
     parser = init_argparse()
     args = parser.parse_args()
+    root_path = Path(getattr(args, cfg.DATA_DIR_ARG)[0]).resolve()
     settings_path = Path(root_path, cfg.SETTINGS_DIR,
                          cfg.PREDICTION_SETTINGS_FN)
     settings = SettingsData(settings_path)
