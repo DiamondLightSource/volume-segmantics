@@ -99,7 +99,7 @@ class Unet3dTrainer(BaseUnet3dUtility):
         else:
             logging.error("No loss criterion specified, exiting")
             sys.exit(1)
-        return loss_criterion
+        return loss_criterion.to(DEVICE_NUM)
 
     def get_eval_metric(self):
         # Get evaluation metric
@@ -136,7 +136,7 @@ class Unet3dTrainer(BaseUnet3dUtility):
         iters = 0
 
         self.model.train()
-        print(
+        logging.info(
             f"Training for {self.lr_find_epochs} epochs to create a learning "
             "rate plot."
         )
