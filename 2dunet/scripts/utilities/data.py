@@ -11,12 +11,12 @@ from datetime import date
 from itertools import chain, product
 from pathlib import Path
 
-import dask.array as da
 import h5py as h5
+import imageio
 import numpy as np
+import torch
 import yaml
 from fastai.vision import Image, crop_pad, pil2tensor
-import torch
 from skimage import exposure, img_as_float, img_as_ubyte, io
 from skimage.measure import block_reduce
 from tqdm import tqdm
@@ -27,14 +27,12 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 
 class SettingsData:
-    """Class to sanity check and then store settings from the commandline and
-    a YAML settings file. Assumes given commandline args are filepaths.
+    """Class to store settings from a YAML settings file.
 
     Args:
         settings_path (pathlib.Path): Path to the YAML file containing user settings.
-        parser_args (argparse.Namespace): Parsed commandline arguments from argparse.
     """
-    def __init__(self, settings_path, parser_args):
+    def __init__(self, settings_path):
         logging.info(f"Loading settings from {settings_path}")
         if settings_path.exists():
             self.settings_path = settings_path
@@ -43,19 +41,11 @@ class SettingsData:
         else:
             logging.error("Couldn't find settings file... Exiting!")
             sys.exit(1)
-        logging.debug(f"Commandline args given: {vars(parser_args)}")
 
-        # Set the data as attributes, check paths are valid files
+        # Set the data as attributes
         for k, v in self.settings_dict.items():
             setattr(self, k, v)
-        for k, v in vars(parser_args).items():
-            # Check that files exist
-            v = Path(v)
-            if v.is_file():
-                setattr(self, k, v)
-            else:
-                logging.error(f"The file {v} does not appear to exist. Exiting!")
-                sys.exit(1)
+                    
 
 class DataSlicerBase:
     """Base class for classes that convert 3d data volumes into 2d image slices on disk.
@@ -66,6 +56,7 @@ class DataSlicerBase:
     """
 
     def __init__(self, settings):
+        self.input_data_chunking = None
         self.st_dev_factor = settings.st_dev_factor
         self.downsample = settings.downsample
         if self.downsample:
@@ -74,7 +65,7 @@ class DataSlicerBase:
         logging.info("Calculating mean of data...")
         self.data_mean = np.nanmean(self.data_vol)
         logging.info(f"Mean value: {self.data_mean}")
-        if settings.normalise:
+        if settings.clip_data:
             self.data_vol = self.clip_to_uint8(self.data_vol)
         if np.isnan(self.data_vol).any():
             logging.info(f"Replacing NaN values.")
@@ -84,6 +75,36 @@ class DataSlicerBase:
     def downsample_data(self, data, factor=2):
         logging.info(f"Downsampling data by a factor of {factor}.")
         return block_reduce(data, block_size=(factor, factor, factor), func=np.nanmean)
+
+    def get_numpy_from_path(self, path, internal_path="/data"):
+        """Helper function that returns numpy array according to file extension.
+
+        Args:
+            path (pathlib.Path): The path to the data file. 
+            internal_path (str, optional): Internal path within HDF5 file. Defaults to "/data".
+
+        Returns:
+            numpy.ndarray: Numpy array from the file given in the path.
+        """
+        if path.suffix in cfg.TIFF_SUFFIXES:
+            return self.numpy_from_tiff(path)
+        elif path.suffix in cfg.HDF5_SUFFIXES:
+            nexus = path.suffix == ".nxs"
+            return self.numpy_from_hdf5(path,
+                                        hdf5_path=internal_path,
+                                        nexus=nexus)
+    
+    def numpy_from_tiff(self, path):
+        """Returns a numpy array when given a path to an multipage TIFF file.
+
+        Args:
+            path(pathlib.Path): The path to the TIFF file.
+
+        Returns:
+            numpy.array: A numpy array object for the data stored in the TIFF file.
+        """
+        
+        return imageio.volread(path)
 
     def numpy_from_hdf5(self, path, hdf5_path='/data', nexus=False):
         """Returns a numpy array when given a path to an HDF5 file.
@@ -98,20 +119,21 @@ class DataSlicerBase:
             numpy.array: A numpy array object for the data stored in the HDF5 file.
         """
         
-        with h5.File(path, 'r') as f:
-            if nexus:
+        data_handle = h5.File(path, 'r')
+        if nexus:
+            try:
+                dataset = data_handle['processed/result/data']
+            except KeyError:
+                logging.error("NXS file: Couldn't find data at 'processed/result/data' trying another path.")
                 try:
-                    data = f['processed/result/data'][()]
+                    dataset = data_handle['entry/final_result_tomo/data']
                 except KeyError:
-                    logging.error("NXS file: Couldn't find data at 'processed/result/data' trying another path.")
-                    try:
-                        data = f['entry/final_result_tomo/data'][()]
-                    except KeyError:
-                        print("NXS file: Could not find entry at entry/final_result_tomo/data, exiting!")
-                        sys.exit(1)
-            else:
-                data = f[hdf5_path][()]
-        return data
+                    logging.error("NXS file: Could not find entry at entry/final_result_tomo/data, exiting!")
+                    sys.exit(1)
+        else:
+            dataset = data_handle[hdf5_path]
+        self.input_data_chunking = dataset.chunks
+        return dataset[()]
 
     def clip_to_uint8(self, data):
         """Clips data to a certain number of st_devs of the mean and reduces
@@ -217,18 +239,18 @@ class TrainingDataSlicer(DataSlicerBase):
         settings (SettingsData): An initialised SettingsData object.
     """
 
-    def __init__(self, settings):
-        self.data_vol_path = Path(getattr(settings, cfg.TRAIN_DATA_ARG))
-        nexus = self.data_vol_path.suffix == ".nxs"
-        self.data_vol = self.numpy_from_hdf5(self.data_vol_path,
-                                          hdf5_path=settings.train_data_hdf5_path, nexus=nexus)
+    def __init__(self, settings, data_vol_path, label_vol_path):
+        self.data_vol_path = Path(data_vol_path)
+        self.data_vol = self.get_numpy_from_path(self.data_vol_path,
+        										 internal_path=settings.train_data_hdf5_path)
+       
         super().__init__(settings)
         self.multilabel = False
         self.data_im_out_dir = None
         self.seg_im_out_dir = None
-        seg_vol_path = getattr(settings, cfg.LABEL_DATA_ARG)
-        self.seg_vol = self.numpy_from_hdf5(seg_vol_path,
-                                         hdf5_path=settings.seg_hdf5_path)
+        label_vol_path = Path(label_vol_path)
+        self.seg_vol = self.get_numpy_from_path(label_vol_path,
+                                         internal_path=settings.seg_hdf5_path)
         seg_classes = np.unique(self.seg_vol)
         self.num_seg_classes = len(seg_classes)
         if self.num_seg_classes > 2:
@@ -251,7 +273,7 @@ class TrainingDataSlicer(DataSlicerBase):
         for idx, current in enumerate(seg_classes):
             self.seg_vol[self.seg_vol == current] = idx
 
-    def output_data_slices(self, data_dir):
+    def output_data_slices(self, data_dir, prefix):
         """Wrapper method to intitiate slicing data volume to disk.
 
         Args:
@@ -261,9 +283,9 @@ class TrainingDataSlicer(DataSlicerBase):
         logging.info(
             'Slicing data volume and saving slices to disk')
         os.makedirs(data_dir, exist_ok=True)
-        self.output_slices_to_disk(self.data_vol, data_dir, 'data')
+        self.output_slices_to_disk(self.data_vol, data_dir, prefix)
 
-    def output_label_slices(self, data_dir):
+    def output_label_slices(self, data_dir, prefix):
         """Wrapper method to intitiate slicing label volume to disk.
 
         Args:
@@ -274,7 +296,7 @@ class TrainingDataSlicer(DataSlicerBase):
             'Slicing label volume and saving slices to disk')
         os.makedirs(data_dir, exist_ok=True)
         self.output_slices_to_disk(
-            self.seg_vol, data_dir, 'seg', label=True)
+            self.seg_vol, data_dir, prefix, label=True)
 
     def output_slices_to_disk(self, data_arr, output_path, name_prefix, label=False):
         """Coordinates the slicing of an image volume in the three orthogonal
@@ -301,8 +323,11 @@ class TrainingDataSlicer(DataSlicerBase):
             path (str): The path of the image file including the filename prefix.
             label (bool): Whether to convert values >1 to 1 for binary segmentation.
         """
-        if label and not self.multilabel:
-            data[data > 1] = 1
+        if label:
+            if data.dtype != np.uint8:
+                data = img_as_ubyte(data)
+            if not self.multilabel:
+                data[data > 1] = 1
         io.imsave(f'{path}.png', data)
 
     def delete_data_im_slices(self):
@@ -352,15 +377,27 @@ class PredictionDataSlicer(DataSlicerBase):
         2d U-net as an attribute.
     """
 
-    def __init__(self, settings, predictor):
-        self.data_vol_path = Path(getattr(settings, cfg.PREDICT_DATA_ARG))
-        nexus = self.data_vol_path.suffix == ".nxs"
-        self.data_vol = self.numpy_from_hdf5(self.data_vol_path,
-                                          hdf5_path=settings.predict_data_hdf5_path, nexus=nexus)
+    def __init__(self, settings, predictor, data_vol_path):
+        self.data_vol_path = Path(data_vol_path)
+        self.data_vol =  self.get_numpy_from_path(self.data_vol_path,
+        										  internal_path=settings.predict_data_hdf5_path)
+        self.check_data_dims(self.data_vol.shape)
         super().__init__(settings)
         self.consensus_vals = map(int, settings.consensus_vals)
         self.predictor = predictor
         self.delete_vols = settings.del_vols # Whether to clean up predicted vols
+
+    def check_data_dims(self, data_vol_shape):
+        """Terminates program if one or more data dimensions is not even.
+
+        Args:
+            data_vol_shape (tuple): The shape of the data.
+        """
+        odd_dims = [x%2 != 0 for x in data_vol_shape]
+        if any(odd_dims):
+            logging.error(f"One or more data dimensions is not even: {data_vol_shape}. "
+                            "Cannot currently predict odd-sized shapes, please change dimensions and try again.")
+            sys.exit(1)
 
     def setup_folder_stucture(self, root_path):
         """Sets up a folder structure to store the predicted images.
@@ -566,9 +603,9 @@ class PredictionDataSlicer(DataSlicerBase):
 
 class PredictionHDF5DataSlicer(PredictionDataSlicer):
 
-    def __init__(self, settings, predictor):
+    def __init__(self, settings, predictor, data_vol_path):
         logging.info(f"Using {self.__class__.__name__}")
-        super().__init__(settings, predictor)
+        super().__init__(settings, predictor, data_vol_path)
         self.output_probs = settings.output_probs
         self.quality = settings.quality
 
@@ -648,13 +685,7 @@ class PredictionHDF5DataSlicer(PredictionDataSlicer):
         if k==0:
             fastz_out_path = output_path.parent/f"{self.data_vol_path.stem}_1_plane_prediction.h5"
             logging.info(f"Saving single plane prediction to {fastz_out_path}")
-            with h5.File(fastz_out_path, 'w') as f:
-                    # Upsample segmentation if data has been downsampled
-                if self.downsample:
-                    f['/labels'] = self.upsample_segmentation(label_container[0])
-                else:
-                    f['/labels'] = label_container[0]
-                f['/data'] = f['/labels']
+            self.save_data_to_hdf5(label_container, fastz_out_path)
             if self.quality == 'low':
                 logging.info("Quality set to low. Ending processing.")
                 sys.exit(0)
@@ -685,18 +716,22 @@ class PredictionHDF5DataSlicer(PredictionDataSlicer):
         if k == 0:
             fast3_vol_out_path = output_path.parent/f"{self.data_vol_path.stem}_3_plane_prediction.h5"
             logging.info(f"Saving 3 plane prediction to {fast3_vol_out_path}")
-            with h5.File(fast3_vol_out_path, 'w') as f:
-                # Upsample segmentation if data has been downsampled
-                if self.downsample:
-                    f['/labels'] = self.upsample_segmentation(
-                        label_container[0])
-                else:
-                    f['/labels'] = label_container[0]
-                f['/data'] = f['/labels']
+            self.save_data_to_hdf5(label_container, fast3_vol_out_path)
             if self.quality == 'medium':
                 logging.info("Quality set to medium. Ending processing.")
                 sys.exit(0)
         return combined_out
+
+    def save_data_to_hdf5(self, label_container, out_path):
+        chunking = self.input_data_chunking if self.input_data_chunking else True
+        with h5.File(out_path, 'w') as f:
+                    # Upsample segmentation if data has been downsampled
+            if self.downsample:
+                labels = self.upsample_segmentation(label_container[0])
+            else:
+                labels = label_container[0]
+            f.create_dataset("/labels", data=labels, chunks=chunking, compression="gzip")
+            f['/data'] = f['/labels']
 
     def merge_vols_in_mem(self, prob_container, label_container):
         max_prob_idx = np.argmax(prob_container, axis=0)
@@ -745,18 +780,15 @@ class PredictionHDF5DataSlicer(PredictionDataSlicer):
                 subsequent, '/labels')
             self.merge_vols_in_mem(prob_container, label_container)
         logging.info(f"Saving final data out to: {combined_label_out_path}.")
-        with h5.File(combined_label_out_path, 'w') as f:
-            # Upsample segmentation if data has been downsampled
-            if self.downsample:
-                f['/labels'] = self.upsample_segmentation(label_container[0])
-            else:
-                f['/labels'] = label_container[0]
-            f['/data'] = f['/labels']
+        self.save_data_to_hdf5(label_container, combined_label_out_path)
         if self.output_probs:
             logging.info(f"Saving final probabilities out to: {combined_prob_out_path}.")
+            chunking = self.input_data_chunking if self.input_data_chunking else True
             with h5.File(combined_prob_out_path, 'w') as f:
-                f['/probabilities'] = prob_container[0]
-                f['/data'] = f['/probabilities']
+                    # Upsample segmentation if data has been downsampled
+                probs = prob_container[0]
+                f.create_dataset("/probabilities", data=probs, chunks=chunking, compression="gzip")
+                f['/data'] = f["/probabilities"]
 
     def tile_array(self, a, b0, b1, b2):
         """Fast method for upsampling a segmentation by repeating values.

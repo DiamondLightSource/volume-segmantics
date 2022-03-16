@@ -2,7 +2,7 @@
 use_max_probs: True # If True combine the predicted volumes using maximum probabilies, if False, combine the predicded labels and threshold
                     # the data using using consensus values (This will only work for data with 2 labels).
 output_probs: False # If set to True a separate volume of probabilty values for the predictions will be saved alongside the labels.
-normalise: True # If set to True, the image data will be clipped and normalised before prediction. Set to False if data is already normalised.
+clip_data: True # If set to True, the image data intensities will be clipped and rescaled before prediction. Set to False if data is already clipped.
 st_dev_factor: 2.575 # Number of standard deviations from the mean to clip data to.
 predict_data_hdf5_path: /data # Internal path in the HDF5 file where the image data for prediction is stored.
 del_vols: True # Whether to clean up the 16 intermediate predicted volumes to save disk space.

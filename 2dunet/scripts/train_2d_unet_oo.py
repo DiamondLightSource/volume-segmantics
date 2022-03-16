@@ -4,6 +4,7 @@ import argparse
 import logging
 from datetime import date
 from pathlib import Path
+import sys
 
 from utilities import config as cfg
 from utilities.cmdline import CheckExt
@@ -19,7 +20,7 @@ def init_argparse() -> argparse.ArgumentParser:
         command line args contained within.
     """
     parser = argparse.ArgumentParser(
-        usage="%(prog)s [path/to/data/file.h5] [path/to/segmentation/file.h5]",
+        usage="%(prog)s --data <path(s)/to/data/file(s).h5> --labels <path(s)/to/segmentation/file(s).h5>",
         description="Train a 2d U-net model on the 3d data and corresponding"
         " segmentation provided in the files."
     )
@@ -27,11 +28,13 @@ def init_argparse() -> argparse.ArgumentParser:
         "-v", "--version", action="version",
         version=f"{parser.prog} version 1.0.0"
     )
-    parser.add_argument(cfg.TRAIN_DATA_ARG, metavar='Path to training image data volume', type=str,
+    parser.add_argument("--" + cfg.TRAIN_DATA_ARG, metavar='Path to training image data volume', type=str,
                         action=CheckExt(cfg.TRAIN_DATA_EXT),
+                        nargs="+", required=True,
                         help='the path to an HDF5 file containing the imaging data volume for training')
-    parser.add_argument(cfg.LABEL_DATA_ARG, metavar='Path to label volume', type=str,
+    parser.add_argument("--" + cfg.LABEL_DATA_ARG, metavar='Path to label volume', type=str,
                         action=CheckExt(cfg.LABEL_DATA_EXT),
+                        nargs="+", required=True,
                         help='the path to an HDF5 file containing a segmented volume for training')
     return parser
 
@@ -40,19 +43,34 @@ if __name__ == "__main__":
         level=logging.INFO, format=cfg.LOGGING_FMT,
         datefmt=cfg.LOGGING_DATE_FMT)
     root_path = Path.cwd()  # For module load script, use the CWD
-    # Set up the settings
+    # Parse args and check correct numer of volumes given
     parser = init_argparse()
     args = parser.parse_args()
+    data_vols = getattr(args, cfg.TRAIN_DATA_ARG)
+    label_vols = getattr(args, cfg.LABEL_DATA_ARG)
+    if len(data_vols) != len(label_vols):
+        logging.error("Number of data volumes and number of label volumes must be equal!")
+        sys.exit(1)
+    # Create the settings object
     settings_path = Path(root_path, cfg.SETTINGS_DIR, cfg.TRAIN_SETTINGS_FN)
-    settings = SettingsData(settings_path, args)
-    # Set up the DataSlicer and slice the data volumes into image files
+    settings = SettingsData(settings_path)
     data_im_out_dir = root_path/settings.data_im_dirname # dir for data imgs
     seg_im_out_dir = root_path/settings.seg_im_out_dirname # dir for seg imgs
-    slicer = TrainingDataSlicer(settings)
-    slicer.output_data_slices(data_im_out_dir)
-    slicer.output_label_slices(seg_im_out_dir)
+    # Keep track of the number of labels
+    max_label_no = 0
+    label_codes = None
+    # Set up the DataSlicer and slice the data volumes into image files
+    for count, (data_vol_path, label_vol_path) in enumerate(zip(data_vols, label_vols)):
+        slicer = TrainingDataSlicer(settings, data_vol_path, label_vol_path)
+        data_prefix, label_prefix = f"data{count}", f"seg{count}"
+        slicer.output_data_slices(data_im_out_dir, data_prefix)
+        slicer.output_label_slices(seg_im_out_dir, label_prefix)
+        if slicer.num_seg_classes > max_label_no:
+            max_label_no = slicer.num_seg_classes
+            label_codes = slicer.codes
+    assert(label_codes is not None)
     # Set up the UnetTrainer
-    trainer = Unet2dTrainer(data_im_out_dir, seg_im_out_dir, slicer.codes,
+    trainer = Unet2dTrainer(data_im_out_dir, seg_im_out_dir, label_codes,
                             settings)
     # Train the model
     trainer.train_model()

@@ -3,6 +3,7 @@
 import argparse
 import logging
 import os
+from torch.cuda import set_device
 import warnings
 from pathlib import Path
 
@@ -31,10 +32,10 @@ def init_argparse() -> argparse.ArgumentParser:
         version=f"{parser.prog} version 1.0.0"
     )
     parser.add_argument(cfg.MODEL_PTH_ARG, metavar='Model file path', type=str,
-                        action=CheckExt(cfg.MODEL_DATA_EXT),
+                        action=CheckExt(cfg.MODEL_DATA_EXT), nargs="+",
                         help='the path to a zip file containing the model weights.')
     parser.add_argument(cfg.PREDICT_DATA_ARG, metavar='Path to prediction data volume', type=str,
-                        action=CheckExt(cfg.PREDICT_DATA_EXT),
+                        action=CheckExt(cfg.PREDICT_DATA_EXT), nargs="+",
                         help='the path to an HDF5 file containing the imaging data to segment')
     return parser
 
@@ -48,17 +49,19 @@ if __name__ == "__main__":
     args = parser.parse_args()
     settings_path = Path(root_path, cfg.SETTINGS_DIR,
                          cfg.PREDICTION_SETTINGS_FN)
-    settings = SettingsData(settings_path, args)
+    settings = SettingsData(settings_path)
     # Select the requested GPU
     logging.info(f"Setting CUDA device {settings.cuda_device}")
-    os.environ['CUDA_VISIBLE_DEVICES'] = str(settings.cuda_device)
+    set_device(f'cuda:{settings.cuda_device}')
+    # os.environ['CUDA_VISIBLE_DEVICES'] = str(settings.cuda_device)
     # Create a model from the saved .zip file
-    model_file_path = getattr(settings, cfg.MODEL_PTH_ARG)
+    model_file_path = getattr(args, cfg.MODEL_PTH_ARG)[0]
     predictor = Unet2dPredictor(root_path)
-    predictor.create_model_from_zip(model_file_path)
+    predictor.create_model_from_zip(Path(model_file_path))
     # Create a slicer to slice and predict the segmentations from the data
+    data_vol_path = getattr(args, cfg.PREDICT_DATA_ARG)[0]
     if settings.use_max_probs:
-        slicer = PredictionHDF5DataSlicer(settings, predictor)
+        slicer = PredictionHDF5DataSlicer(settings, predictor, data_vol_path)
     else:
-        slicer = PredictionDataSlicer(settings, predictor)
+        slicer = PredictionDataSlicer(settings, predictor, data_vol_path)
     slicer.predict_12_ways(root_path)

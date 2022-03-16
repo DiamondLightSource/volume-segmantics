@@ -11,7 +11,7 @@ else
     exit 1
 fi
 module load hamilton
-JOBID=$(qsub -P k11 -q all.q -N unet_segment -j yes -pe smp 2 -l gpu=1 -l gpu_arch=Volta -l h=cs05r-sc-gpu04-04 -o ${output_folder} -e ${output_folder} ${script_path} ${model_path} ${input_data_path} ${output_folder})
+JOBID=$(qsub -P k11 -q all.q -N unet_segment -j yes -pe smp 2 -l gpu=1 -l gpu_arch=Volta -o ${output_folder} -e ${output_folder} ${script_path} ${model_path} ${input_data_path} ${output_folder})
 JOBID=`echo $JOBID | awk 'match($0,/[0-9]+/){print substr($0, RSTART, RLENGTH)}'`
 while qstat -j $JOBID &> /dev/null; do
     sleep 5;

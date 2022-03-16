@@ -11,12 +11,14 @@ from pathlib import Path
 from zipfile import ZipFile
 
 import numpy as np
+from pytorch3dunet.unet3d.losses import GeneralizedDiceLoss
+import torch
 import torch.nn.functional as F
 from fastai.callbacks import CSVLogger, SaveModelCallback
 from fastai.utils.mem import gpu_mem_get_free_no_cache
 from fastai.vision import (SegmentationItemList, dice, get_transforms,
                            imagenet_stats, lr_find, models, open_image,
-                           unet_learner)
+                           unet_learner, crop_pad)
 import matplotlib as mpl
 mpl.use('Agg')
 from matplotlib import pyplot as plt
@@ -49,6 +51,9 @@ class Unet2dTrainer:
         self.lr_find_lr_diff = 15
         self.lr_find_loss_threshold = 0.05
         self.lr_find_adjust_value = 1
+        self.gdl = None
+        if settings.use_gdl:
+            self.gdl = GeneralizedDiceLoss(sigmoid_normalization=False)
         # Params for model training
         self.weight_decay = float(settings.weight_decay)
         self.num_cyc_frozen = settings.num_cyc_frozen
@@ -65,6 +70,7 @@ class Unet2dTrainer:
         according to whether binary or multilabel segmentation is being
         performed. 
         """
+        
         if self.multilabel:
             logging.info("Setting up for multilabel segmentation since there are "
                          f"{len(self.codes)} classes")
@@ -77,7 +83,11 @@ class Unet2dTrainer:
             self.metrics = [partial(dice, iou=True)]
             self.monitor = 'dice'
             self.loss_func = self.bce_loss
-
+        # If Generalised dice loss is selected, overwrite loss function
+        if self.gdl:
+            logging.info("Using generalised dice loss.")
+            self.loss_func = self.generalised_dice_loss
+           
     def create_training_dataset(self):
         """Creates a fastai segmentation dataset and stores it as an instance
         attribute.
@@ -167,6 +177,7 @@ class Unet2dTrainer:
             img_list.append(open_image(fn))
             gt_list.append(io.imread(self.get_label_name(fn)))
         for img in img_list:
+            self.fix_odd_sides(img)
             pred_list.append(img_as_ubyte(self.model.predict(img)[1][0]))
         # Horrible conversion from Fastai image to unit8 data array
         img_list = [img_as_ubyte(exposure.rescale_intensity(
@@ -242,6 +253,26 @@ class Unet2dTrainer:
             " of GPU RAM free.")
         return batch_size
 
+    def fix_odd_sides(self, example_image):
+        """Replaces an an odd image dimension with an even dimension by padding.
+    
+        Taken from https://forums.fast.ai/t/segmentation-mask-prediction-on-different-input-image-sizes/44389/7.
+
+        Args:
+            example_image (fastai.vision.Image): The image to be fixed.
+        """
+        if (list(example_image.size)[0] % 2) != 0:
+            example_image = crop_pad(example_image,
+                                    size=(list(example_image.size)[
+                                        0]+1, list(example_image.size)[1]),
+                                    padding_mode='reflection')
+
+        if (list(example_image.size)[1] % 2) != 0:
+            example_image = crop_pad(example_image,
+                                    size=(list(example_image.size)[0], list(
+                                        example_image.size)[1] + 1),
+                                    padding_mode='reflection')
+
     def bce_loss(self, logits, labels):
         """Function to calulate Binary Cross Entropy loss from predictions.
 
@@ -255,6 +286,11 @@ class Unet2dTrainer:
         logits = logits[:, 1, :, :].float()
         labels = labels.squeeze(1).float()
         return F.binary_cross_entropy_with_logits(logits, labels)
+
+    def generalised_dice_loss(self, logits, labels):
+        labels = F.one_hot(torch.squeeze(labels), len(self.codes))
+        labels = labels.permute((0, 3, 1, 2))
+        return self.gdl(logits, labels)
     
     def accuracy(self, input, target):
         """Calculates and accuracy metric between predictions and ground truth
@@ -338,7 +374,13 @@ class Unet2dPredictor:
         out_path = self.root_dir/output_dir
         # Load in the label classes from the json file
         with open(out_path/f"{weights_fn.stem}_codes.json") as jf:
-            self.codes = json.load(jf)
+            codes = json.load(jf)
+        logging.info(f"{codes}")
+        if isinstance(codes, dict):
+            logging.info("Converting label dictionary into list.")
+            self.codes = [f"label_val_{i}" for i in codes]
+        else:
+            self.codes = codes
         # Have to create dummy files and datset before loading in model weights 
         self.create_dummy_files()
         self.create_dummy_dataset()
