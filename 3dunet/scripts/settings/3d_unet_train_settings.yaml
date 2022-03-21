@@ -1,14 +1,14 @@
 # Things you might want to change
 # -------------------------------
-cuda_device: 3 # The graphics card to use (between 0 and 3 for a machine with 4 GPUs)
+cuda_device: 0 # The graphics card to use (between 0 and 3 for a machine with 4 GPUs)
 model_output_fn: trained3dUnet_model # Suffix for the saved U-net model filename
-normalise: False # Rescale the image intensities and rescale to uint8 before training
+normalise: True # Rescale the image intensities and rescale to uint8 before training
 st_dev_factor: 2.575 # The number of standard deviations from the mean to clip data to
 hdf5_path: /data # The internal HDF5 path to the image data
 downsample: False # If True, data will be downsampled by 2
 # Training parameters
-num_epochs: 2 # Maximum number of epochs for training
-patience: 1 # Number of epoch to wait before early stopping if validation loss does not improve
+num_epochs: 50 # Maximum number of epochs for training
+patience: 6 # Number of epoch to wait before early stopping if validation loss does not improve
 loss_criterion: DiceLoss # Choose from one of [BCEDiceLoss, BCELoss, DiceLoss, GeneralizedDiceLoss, CrossEntropyLoss]
 alpha: 0.75 # When BCEDiceLoss selected, weighting for BCELoss
 beta: 0.25 # When BCEDiceLoss selected, weighting for DiceLoss
