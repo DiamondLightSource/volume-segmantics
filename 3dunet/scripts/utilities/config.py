@@ -7,6 +7,7 @@ TRAIN_VAL_DATA_ARG = "train_val_data_path"
 LABEL_VAL_DATA_ARG = "label_val_vol_path"
 MODEL_PTH_ARG = "model_file"
 PREDICT_DATA_ARG = "predict_data_path"
+DATA_DIR_ARG = "data_dir"
 # File extensions
 TRAIN_DATA_EXT = {"h5", "hdf5", "nxs"}
 LABEL_DATA_EXT = {"h5", "hdf5"}

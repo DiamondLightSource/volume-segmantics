@@ -57,6 +57,9 @@ def init_argparse() -> argparse.ArgumentParser:
         action=CheckExt(cfg.LABEL_DATA_EXT),
         help="the path to an HDF5 file containing a segmented validation volume for training",
     )
+    parser.add_argument(cfg.DATA_DIR_ARG, metavar='Path to settings and output directory',
+                        type=str,
+                        help='the path to a directory containing the "unet-settings", data will be output to this location')
     return parser
 
 
@@ -64,10 +67,10 @@ if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO, format=cfg.LOGGING_FMT, datefmt=cfg.LOGGING_DATE_FMT
     )
-    root_path = Path.cwd()  # For module load script, use the CWD
     # Set up the settings
     parser = init_argparse()
     args = parser.parse_args()
+    root_path = Path(getattr(args, cfg.DATA_DIR_ARG)).resolve()
     settings_path = Path(root_path, cfg.SETTINGS_DIR, cfg.TRAIN_SETTINGS_3D)
     settings = SettingsData(settings_path, args)
     # Set the CUDA device
