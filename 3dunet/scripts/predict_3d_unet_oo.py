@@ -21,7 +21,7 @@ def init_argparse() -> argparse.ArgumentParser:
         command line args contained within.
     """
     parser = argparse.ArgumentParser(
-        usage="%(prog)s [path/to/model/file.pytorch] [path/to/data/file.h5]",
+        usage="%(prog)s path/to/model/file.pytorch path/to/data/file.h5 path/to/data_directory",
         description="Predict segmentation of a 3d data volume using the 3d"
         " model provided."
     )

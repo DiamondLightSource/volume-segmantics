@@ -21,8 +21,9 @@ def init_argparse() -> argparse.ArgumentParser:
         command line args contained within.
     """
     parser = argparse.ArgumentParser(
-        usage="%(prog)s [path/to/data/file.h5] [path/to/segmentation/file.h5]"
-        "[path/to/validation_data/file.h5] [path/to/validation_segmentation/file.h5]",
+        usage="%(prog)s path/to/data/file.h5 path/to/segmentation/file.h5"
+        "path/to/validation_data/file.h5 path/to/validation_segmentation/file.h5"
+        "path/to/directory/with/unet-settings",
         description="Train a 3d U-net model on the 3d data and corresponding"
         " segmentation provided in the files.",
     )

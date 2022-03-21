@@ -33,12 +33,12 @@ class SettingsData:
         for k, v in self.settings_dict.items():
             setattr(self, k, v)
         for k, v in vars(parser_args).items():
-            # Check that files exist
+            # Check that paths exist
             v = Path(v)
-            if v.is_file():
+            if v.exists():
                 setattr(self, k, v)
             else:
-                logging.error(f"The file {v} does not appear to exist. Exiting!")
+                logging.error(f"{v} does not appear to exist. Exiting!")
                 sys.exit(1)
 
 
