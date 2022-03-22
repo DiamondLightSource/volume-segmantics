@@ -58,9 +58,9 @@ def init_argparse() -> argparse.ArgumentParser:
         action=CheckExt(cfg.LABEL_DATA_EXT),
         help="the path to an HDF5 file containing a segmented validation volume for training",
     )
-    parser.add_argument(cfg.DATA_DIR_ARG, metavar='Path to settings and output directory',
-                        type=str,
-                        help='the path to a directory containing the "unet-settings", data will be output to this location')
+    parser.add_argument("--" + cfg.DATA_DIR_ARG, metavar='Path to settings and output directory (optional)', type=str,
+                        nargs="?", default=Path.cwd(),
+                        help='path to a directory containing the "unet-settings", data will be also be output to this location')
     return parser
 
 

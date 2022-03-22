@@ -36,9 +36,9 @@ def init_argparse() -> argparse.ArgumentParser:
                         action=CheckExt(cfg.LABEL_DATA_EXT),
                         nargs="+", required=True,
                         help='the path(s) to file(s) containing a segmented volume for training')
-    parser.add_argument("--" + cfg.DATA_DIR_ARG, metavar='Path to settings and output directory', type=str,
-                        nargs="+", required=True,
-                        help='the path to a directory containing the "unet-settings", data will be output to this location')
+    parser.add_argument("--" + cfg.DATA_DIR_ARG, metavar='Path to settings and output directory (optional)', type=str,
+                        nargs="?", default=Path.cwd(),
+                        help='path to a directory containing the "unet-settings", data will be also be output to this location')
     return parser
 
 if __name__ == "__main__":
@@ -50,7 +50,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     data_vols = getattr(args, cfg.TRAIN_DATA_ARG)
     label_vols = getattr(args, cfg.LABEL_DATA_ARG)
-    root_path = Path(getattr(args, cfg.DATA_DIR_ARG)[0]).resolve() 
+    root_path = Path(getattr(args, cfg.DATA_DIR_ARG)).resolve() 
     if len(data_vols) != len(label_vols):
         logging.error("Number of data volumes and number of label volumes must be equal!")
         sys.exit(1)

@@ -35,9 +35,9 @@ def init_argparse() -> argparse.ArgumentParser:
     parser.add_argument(cfg.PREDICT_DATA_ARG, metavar='Path to prediction data volume', type=str,
                         action=CheckExt(cfg.PREDICT_DATA_EXT),
                         help='the path to an HDF5 file containing the imaging data to segment')
-    parser.add_argument(cfg.DATA_DIR_ARG, metavar='Path to settings and output directory',
-                        type=str,
-                        help='the path to a directory containing the "unet-settings", data will be output to this location')
+    parser.add_argument("--" + cfg.DATA_DIR_ARG, metavar='Path to settings and output directory (optional)', type=str,
+                        nargs="?", default=Path.cwd(),
+                        help='path to a directory containing the "unet-settings", data will be also be output to this location')
     return parser
 
 
