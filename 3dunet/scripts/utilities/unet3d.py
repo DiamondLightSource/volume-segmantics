@@ -130,7 +130,7 @@ class Unet3dTrainer(BaseUnet3dUtility):
         targets = torch.stack(channels, 1).to(device, dtype=torch.uint8)
         return inputs, targets
 
-    def lr_finder(self, lr_scheduler, smoothing=0.05, plt_fig=True):
+    def lr_finder(self, lr_scheduler, smoothing=0.05, plt_fig=False):
         lr_find_loss = []
         lr_find_lr = []
         iters = 0
