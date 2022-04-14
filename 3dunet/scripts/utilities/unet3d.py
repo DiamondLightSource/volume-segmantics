@@ -163,7 +163,7 @@ class Unet3dTrainer(BaseUnet3dUtility):
                 else:
                     loss = smoothing * loss + (1 - smoothing) * lr_find_loss[-1]
                     lr_find_loss.append(loss)
-                if loss > 1 and iters > len(self.training_loader) // 1.333:
+                if loss > 2 and iters > len(self.training_loader) // 1.333:
                     break
                 iters += 1
 
@@ -355,7 +355,7 @@ class Unet3dTrainer(BaseUnet3dUtility):
         plt.grid(True)
         plt.legend()
         plt.tight_layout()
-        fig_out_pth = f"{model_out_path.stem}_loss_plot.png"
+        fig_out_pth = model_out_path.parent / f"{model_out_path.stem}_loss_plot.png"
         logging.info(f"Saving figure of training/validation losses to {fig_out_pth}")
         fig.savefig(fig_out_pth, bbox_inches="tight")
         # Output a list of training stats
