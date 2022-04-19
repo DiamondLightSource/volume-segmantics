@@ -1,0 +1,10 @@
+normalise: False # Rescale the image intensities and rescale to uint8 before training
+st_dev_factor: 2.575 # The number of standard deviations from the mean to clip data to
+hdf5_path: /data # The internal HDF5 path to the image data
+downsample: False # If True, data will be downsampled by 2
+# Parameters for generating patches
+patch_size:
+  [128, 128, 128]
+patch_overlap: 32
+padding_mode: reflect # One of [reflect, edge, circular, null]
+cuda_device: 0 # The graphics card to use (between 0 and 3 for a machine with 4 GPUs)

@@ -8,7 +8,8 @@ import sys
 
 from utilities import config as cfg
 from utilities.cmdline import CheckExt
-from utilities.data import SettingsData, TrainingDataSlicer
+from utilities.settingsdata import SettingsData
+from utilities.slicers.trainingslicers import TrainingDataSlicer
 from utilities.unet2d import Unet2dTrainer
 
 
@@ -72,6 +73,8 @@ if __name__ == "__main__":
             max_label_no = slicer.num_seg_classes
             label_codes = slicer.codes
     assert(label_codes is not None)
+    # Set up the DataLoader to load in and augment the data
+    #loader = TrainingData2dLoader(data_im_out_dir, seg_im_out_dir, settings)
     # Set up the UnetTrainer
     trainer = Unet2dTrainer(data_im_out_dir, seg_im_out_dir, label_codes,
                             settings)
