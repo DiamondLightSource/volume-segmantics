@@ -24,6 +24,6 @@ PREDICTION_SETTINGS_FN = "2d_unet_predict_settings.yaml"
 
 BIG_CUDA_SIZE = 8 # GPU Memory (GB), above this value batch size is increased
 BIG_CUDA_BATCH = 16 # Size of batch on big GPU
-SMALL_CUDA_BATCH = 8 # Size of batch on small GPU
+SMALL_CUDA_BATCH = 4 # Size of batch on small GPU
 NUM_WORKERS = 8 # Number of parallel workers for dataloaders
 PIN_CUDA_MEMORY = True # Whether to pin CUDA memory for faster data transfer 

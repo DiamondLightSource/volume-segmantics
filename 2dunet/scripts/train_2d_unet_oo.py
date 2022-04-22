@@ -10,7 +10,7 @@ from utilities import config as cfg
 from utilities.cmdline import CheckExt
 from utilities.settingsdata import SettingsData
 from utilities.slicers.trainingslicers import TrainingDataSlicer
-from utilities.unet2d import Unet2dTrainer
+from utilities.unet2d.trainer import Unet2dTrainer
 from utilities.dataloaders import get_2d_dataloaders
 
 
@@ -77,15 +77,11 @@ if __name__ == "__main__":
     # Set up the DataLoader to load in and augment the data
     train_loader, valid_loader = get_2d_dataloaders(data_im_out_dir, seg_im_out_dir, settings)
     # Set up the UnetTrainer
-    trainer = Unet2dTrainer(data_im_out_dir, seg_im_out_dir, label_codes,
-                            settings)
+    trainer = Unet2dTrainer(train_loader, valid_loader, max_label_no, settings)
     # Train the model
-    trainer.train_model()
-    # Save the model
-    model_fn = f"{date.today()}_{settings.model_output_fn}"
+    model_fn = f"{date.today()}_{settings.model_output_fn}.pytorch"
     model_out = Path(root_path, model_fn)
-    trainer.save_model_weights(model_out)
-    # Save a figure showing the predictions
-    trainer.output_prediction_figure(model_out)
+    trainer.train_model(model_out, settings.num_epochs, settings.patience)
+    trainer.output_loss_fig(model_out)
     # Clean up all the saved slices
     slicer.clean_up_slices()

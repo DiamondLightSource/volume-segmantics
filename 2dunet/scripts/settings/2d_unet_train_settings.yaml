@@ -17,3 +17,23 @@ num_cyc_frozen: 10 # Number of times to run fit_one_cycle on frozen unet model
 num_cyc_unfrozen: 5 # Number of times to run fit_one_cycle on unfrozen unet model
 downsample: False # If True, data will be downsampled by 2
 cuda_device: 0 # The graphics card to use (between 0 and 3 for a machine with 4 GPUs)
+
+num_epochs: 2 # Maximum number of epochs for training
+patience: 1 # Number of epoch to wait before early stopping if validation loss does not improve
+loss_criterion: "DiceLoss" # Choose from one of [BCEDiceLoss, BCELoss, DiceLoss, GeneralizedDiceLoss, CrossEntropyLoss]
+alpha: 0.75 # When BCEDiceLoss selected, weighting for BCELoss
+beta: 0.25 # When BCEDiceLoss selected, weighting for DiceLoss
+eval_metric: "MeanIoU" # Choose from one of [MeanIoU, GenericAveragePrecision]
+# Parameters for finding learning rate
+starting_lr: 1e-6 # Lower bound of learning rate search
+end_lr: 10 # Upper Bound of learning rate search
+lr_find_epochs: 1 # Number of training epochs for learning rate search
+
+# Parameters to control unet architecture
+model:
+  # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
+  encoder_name: "resnet34"
+   # use `imagenet` pre-trained weights for encoder initialization
+  encoder_weights: "imagenet"
+  # number of input channels to the model
+  in_channels: 1
