@@ -9,9 +9,11 @@ seg_hdf5_path: /data # The internal HDF5 path to the label data
 
 # Settings for Unet training
 image_size: 256 # size of images in databunch used for training
+training_set_proportion: 0.8 # Proportion of images to use the training, rest are used for validation
 use_gdl: False # Whether to use Genaralised Dice Loss (for unbalanced label classes)
 weight_decay: 1e-2 # weight decay 
 pct_lr_inc: 0.3 # the percentage of overall iterations where the LR is increasing
 num_cyc_frozen: 10 # Number of times to run fit_one_cycle on frozen unet model
 num_cyc_unfrozen: 5 # Number of times to run fit_one_cycle on unfrozen unet model
 downsample: False # If True, data will be downsampled by 2
+cuda_device: 0 # The graphics card to use (between 0 and 3 for a machine with 4 GPUs)

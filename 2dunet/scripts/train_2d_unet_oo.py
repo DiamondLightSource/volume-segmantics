@@ -11,6 +11,7 @@ from utilities.cmdline import CheckExt
 from utilities.settingsdata import SettingsData
 from utilities.slicers.trainingslicers import TrainingDataSlicer
 from utilities.unet2d import Unet2dTrainer
+from utilities.dataloaders import get_2d_dataloaders
 
 
 def init_argparse() -> argparse.ArgumentParser:
@@ -74,7 +75,7 @@ if __name__ == "__main__":
             label_codes = slicer.codes
     assert(label_codes is not None)
     # Set up the DataLoader to load in and augment the data
-    #loader = TrainingData2dLoader(data_im_out_dir, seg_im_out_dir, settings)
+    train_loader, valid_loader = get_2d_dataloaders(data_im_out_dir, seg_im_out_dir, settings)
     # Set up the UnetTrainer
     trainer = Unet2dTrainer(data_im_out_dir, seg_im_out_dir, label_codes,
                             settings)
