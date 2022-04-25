@@ -192,6 +192,9 @@ class Unet2dTrainer:
         # Search for index in gradients where loss is lowest before the loss spike
         # Initialize right and left idx using the lr_diff as a spacing unit
         # Set the local min lr as -1 to signify if threshold is too low
+        # TODO Replace this with something similar to the suggested LR from fastai
+        # https://fastai1.fast.ai/callbacks.lr_finder.html
+        # https://github.com/fastai/fastai1/blob/a8327427ad5137c4899a1b4f74745193c9ea5be3/fastai/basic_train.py
         local_min_lr = 0.00075  # Add as default value to fix bug
         r_idx = -1
         l_idx = r_idx - self.lr_find_lr_diff
@@ -372,3 +375,53 @@ class Unet2dTrainer:
             writer.writerow(("Epoch", "Train Loss", "Valid Loss", "Eval Score"))
             for row in rows:
                 writer.writerow(row)
+
+    def output_prediction_figure(self, model_path):
+        """Saves a figure containing image slice data for three random images
+        fromthe validation dataset along with the corresponding ground truth
+        label image and corresponding prediction output from the model attached
+        to this class instance. The image is saved to the same directory as the
+        model weights. 
+
+        Args:
+            model_path (pathlib.Path): Full path to the model weights file,
+            this is used to get the directory and name of the model not to 
+            load and predict.
+        """
+        self.model.eval()  # prep model for evaluation
+        batch = next(iter(self.validation_loader)) # Get first batch
+        with torch.no_grad():
+            inputs, targets = self.prepare_batch(batch, self.model_device_num)
+            output = self.model(inputs)  # Forward pass
+            s_max = nn.Softmax(dim=1)
+            probs = s_max(output)  # Convert the logits to probs
+            labels = torch.argmax(probs, dim=1)  # flatten channels
+
+        # Create the plot
+        bs = self.validation_loader.batch_size
+        if bs < 4:
+            rows = bs
+        else:
+            rows = 4
+        fig = plt.figure(figsize=(12, 16))
+        columns = 3
+        j = 0
+        for i in range(columns*rows)[::3]:
+            img = inputs[j].squeeze().cpu()
+            gt = torch.argmax(targets[j], dim=0).cpu()
+            pred = labels[j].cpu()
+            col1 = fig.add_subplot(rows, columns, i + 1)
+            plt.imshow(img, cmap='gray')
+            col2 = fig.add_subplot(rows, columns, i + 2)
+            plt.imshow(gt, cmap='gray')
+            col3 = fig.add_subplot(rows, columns, i + 3)
+            plt.imshow(pred, cmap='gray')
+            j += 1
+            if i == 0:
+                col1.title.set_text('Data')
+                col2.title.set_text('Ground Truth')
+                col3.title.set_text('Prediction')
+        plt.suptitle(f"Predictions for {model_path.name}", fontsize=16)
+        plt_out_pth = model_path.parent/f'{model_path.stem}_prediction_image.png'
+        logging.info(f"Saving example image predictions to {plt_out_pth}")
+        plt.savefig(plt_out_pth, dpi=300)

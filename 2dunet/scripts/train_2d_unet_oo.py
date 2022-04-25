@@ -83,5 +83,6 @@ if __name__ == "__main__":
     model_out = Path(root_path, model_fn)
     trainer.train_model(model_out, settings.num_epochs, settings.patience)
     trainer.output_loss_fig(model_out)
+    trainer.output_prediction_figure(model_out)
     # Clean up all the saved slices
     slicer.clean_up_slices()
