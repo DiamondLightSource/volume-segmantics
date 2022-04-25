@@ -127,22 +127,9 @@ class Unet2dTrainer:
             for batch in tqdm(
                 self.training_loader,
                 desc=f"Epoch {i + 1}, batch number",
-                bar_format="{l_bar}{bar:30}{r_bar}{bar:-30b}",
+                bar_format=BAR_FORMAT,
             ):
-                inputs, targets = self.prepare_batch(batch, self.model_device_num)
-                inputs = inputs.float()
-                targets = targets.float()
-                self.optimizer.zero_grad()
-                inputs = torch.squeeze(inputs, 2)
-                targets = torch.squeeze(targets, 2)
-                output = self.model(inputs)
-                if self.loss_criterion == "CrossEntropyLoss":
-                    loss = self.loss_criterion(output, torch.argmax(targets, dim=1))
-                else:
-                    loss = self.loss_criterion(output, targets)
-                loss.backward()
-                self.optimizer.step()
-                lr_scheduler.step()
+                loss = self.train_one_batch(lr_scheduler, batch)
                 lr_step = self.optimizer.state_dict()["param_groups"][0]["lr"]
                 lr_find_lr.append(lr_step)
                 if iters == 0:
@@ -263,20 +250,7 @@ class Unet2dTrainer:
             for batch in tqdm(
                 self.training_loader, desc="Training batch", bar_format=BAR_FORMAT
             ):
-                inputs, targets = self.prepare_batch(batch, self.model_device_num)
-                inputs = inputs.float()
-                targets = targets.float()
-                self.optimizer.zero_grad()
-                inputs = torch.squeeze(inputs, 2)
-                targets = torch.squeeze(targets, 2)
-                output = self.model(inputs)  # Forward pass
-                if self.settings.loss_criterion == "CrossEntropyLoss":
-                    loss = self.loss_criterion(output, torch.argmax(targets, dim=1))
-                else:
-                    loss = self.loss_criterion(output, targets)
-                loss.backward()  # Backward pass
-                self.optimizer.step()
-                lr_scheduler.step()  # update the learning rate
+                loss = self.train_one_batch(lr_scheduler, batch)
                 train_losses.append(loss.item())  # record training loss
 
             self.model.eval()  # prep model for evaluation
@@ -287,16 +261,12 @@ class Unet2dTrainer:
                     bar_format=BAR_FORMAT,
                 ):
                     inputs, targets = self.prepare_batch(batch, self.model_device_num)
-                    inputs = inputs.float()
-                    targets = targets.float()
-                    inputs = torch.squeeze(inputs, 2)
-                    targets = torch.squeeze(targets, 2)
-                    output = self.model(inputs.float())  # Forward pass
+                    output = self.model(inputs)  # Forward pass
                     # calculate the loss
                     if self.settings.loss_criterion == "CrossEntropyLoss":
                         loss = self.loss_criterion(output, torch.argmax(targets, dim=1))
                     else:
-                        loss = self.loss_criterion(output, targets)
+                        loss = self.loss_criterion(output, targets.float())
                     valid_losses.append(loss.item())  # record validation loss
                     s_max = nn.Softmax(dim=1)
                     probs = s_max(output)  # Convert the logits to probs
@@ -331,6 +301,19 @@ class Unet2dTrainer:
         # load the last checkpoint with the best model
         model_dict = torch.load(output_path, map_location="cpu")
         self.model.load_state_dict(model_dict["model_state_dict"])
+
+    def train_one_batch(self, lr_scheduler, batch):
+        inputs, targets = self.prepare_batch(batch, self.model_device_num)
+        self.optimizer.zero_grad()
+        output = self.model(inputs)  # Forward pass
+        if self.settings.loss_criterion == "CrossEntropyLoss":
+            loss = self.loss_criterion(output, torch.argmax(targets, dim=1))
+        else:
+            loss = self.loss_criterion(output, targets.float())
+        loss.backward()  # Backward pass
+        self.optimizer.step()
+        lr_scheduler.step()  # update the learning rate
+        return loss
 
     def output_loss_fig(self, model_out_path):
 
