@@ -37,9 +37,6 @@ class Unet2dTrainer:
         self.label_no = label_no
         self.settings = settings
         # Params for learning rate finder
-        self.lr_find_lr_diff = 7
-        self.lr_find_loss_threshold = 0.05
-        self.lr_find_adjust_value = 1
         self.starting_lr = float(settings.starting_lr)
         self.end_lr = float(settings.end_lr)
         self.log_lr_ratio = math.log(self.end_lr / self.starting_lr)
@@ -154,47 +151,31 @@ class Unet2dTrainer:
 
         return lr_find_loss, lr_find_lr
 
-    def find_appropriate_lr(self, lr_find_loss, lr_find_lr):
-        """Function taken from
-        https://forums.fast.ai/t/automated-learning-rate-suggester/44199
-            Parameters:
+    def find_appropriate_lr(self, lr_find_loss: torch.Tensor, lr_find_lr: torch.Tensor) -> float:
+        """Calculates learning rate corresponsing to minimum gradient in graph
+        of loss vs learning rate.
 
-            lr_diff provides the interval distance by units of the “index of LR”
-            (log transform of LRs) between the right and left bound
-            loss_threshold is the maximum difference between the left and right
-            bound’s loss values to stop the shift
-            adjust_value is a coefficient to the final learning rate for pure
-            manual adjustment
+        Args:
+            lr_find_loss (torch.Tensor): Loss values accumulated during training
+            lr_find_lr (torch.Tensor): Learning rate used for mini-batch
+
+        Returns:
+            float: The learning rate at the point when loss was falling most steeply
         """
+        default_min_lr = 0.00075  # Add as default value to fix bug
         # Get loss values and their corresponding gradients, and get lr values
         for i in range(0, len(lr_find_loss)):
             if lr_find_loss[i].is_cuda:
                 lr_find_loss[i] = lr_find_loss[i].cpu()
             lr_find_loss[i] = lr_find_loss[i].detach().numpy()
         losses = np.array(lr_find_loss)
-        assert self.lr_find_lr_diff < len(losses)
-        loss_grad = np.gradient(losses)
-        lrs = lr_find_lr
-
-        # Search for index in gradients where loss is lowest before the loss spike
-        # Initialize right and left idx using the lr_diff as a spacing unit
-        # Set the local min lr as -1 to signify if threshold is too low
-        # TODO Replace this with something similar to the suggested LR from fastai
-        # https://fastai1.fast.ai/callbacks.lr_finder.html
-        # https://github.com/fastai/fastai1/blob/a8327427ad5137c4899a1b4f74745193c9ea5be3/fastai/basic_train.py
-        local_min_lr = 0.00075  # Add as default value to fix bug
-        r_idx = -1
-        l_idx = r_idx - self.lr_find_lr_diff
-        while (l_idx >= -len(losses)) and (
-            abs(loss_grad[r_idx] - loss_grad[l_idx]) > self.lr_find_loss_threshold
-        ):
-            local_min_lr = lrs[l_idx]
-            r_idx -= 1
-            l_idx -= 1
-
-        lr_to_use = local_min_lr * self.lr_find_adjust_value
-
-        return lr_to_use
+        try:
+            min_loss_grad_idx = (np.gradient(losses)).argmin()
+        except:
+            logging.info("Failed to compute gradients, returning default value.")
+            return default_min_lr
+        min_lr = lr_find_lr[min_loss_grad_idx]
+        return min_lr
 
     def train_model(self, output_path, num_epochs, patience):
         """Performs training of model for a number of cycles
