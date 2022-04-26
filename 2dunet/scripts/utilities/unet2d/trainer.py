@@ -1,4 +1,3 @@
-
 import csv
 import logging
 import math
@@ -12,8 +11,7 @@ import termplotlib as tpl
 mpl.use("Agg")
 import torch
 from matplotlib import pyplot as plt
-from pytorch3dunet.unet3d.losses import (BCEDiceLoss, DiceLoss,
-                                         GeneralizedDiceLoss)
+from pytorch3dunet.unet3d.losses import BCEDiceLoss, DiceLoss, GeneralizedDiceLoss
 from pytorch3dunet.unet3d.metrics import GenericAveragePrecision, MeanIoU
 from torch import nn as nn
 from tqdm import tqdm
@@ -22,6 +20,7 @@ from utilities.unet2d.model import create_unet_on_device
 from utilities.early_stopping import EarlyStopping
 
 BAR_FORMAT = "{l_bar}{bar: 30}{r_bar}{bar: -30b}"  # tqdm progress bar
+
 
 class Unet2dTrainer:
     """Class that utlises 2d dataloaders to train a 2d Unet.
@@ -66,7 +65,7 @@ class Unet2dTrainer:
             loss_criterion = BCEDiceLoss(alpha, beta)
         elif self.settings.loss_criterion == "DiceLoss":
             logging.info("Using DiceLoss")
-            loss_criterion = DiceLoss(normalization='none')
+            loss_criterion = DiceLoss(normalization="none")
         elif self.settings.loss_criterion == "BCELoss":
             logging.info("Using BCELoss")
             loss_criterion = nn.BCEWithLogitsLoss()
@@ -94,9 +93,6 @@ class Unet2dTrainer:
             sys.exit(1)
         return eval_metric
 
-    def create_optimizer(self, learning_rate):
-        return torch.optim.AdamW(self.model.parameters(), lr=learning_rate)
-
     def prepare_batch(self, batch, device):
         inputs = batch[0].to(device)
         targets = batch[1]
@@ -110,73 +106,6 @@ class Unet2dTrainer:
         targets = torch.stack(channels, 1).to(device, dtype=torch.uint8)
         return inputs, targets
 
-    def lr_finder(self, lr_scheduler, smoothing=0.05, plt_fig=True):
-        lr_find_loss = []
-        lr_find_lr = []
-        iters = 0
-
-        self.model.train()
-        print(
-            f"Training for {self.lr_find_epochs} epochs to create a learning "
-            "rate plot."
-        )
-        for i in range(self.lr_find_epochs):
-            for batch in tqdm(
-                self.training_loader,
-                desc=f"Epoch {i + 1}, batch number",
-                bar_format=BAR_FORMAT,
-            ):
-                loss = self.train_one_batch(lr_scheduler, batch)
-                lr_step = self.optimizer.state_dict()["param_groups"][0]["lr"]
-                lr_find_lr.append(lr_step)
-                if iters == 0:
-                    lr_find_loss.append(loss)
-                else:
-                    loss = smoothing * loss + (1 - smoothing) * lr_find_loss[-1]
-                    lr_find_loss.append(loss)
-                if loss > 1 and iters > len(self.training_loader) // 1.333:
-                    break
-                iters += 1
-
-        if plt_fig:
-            fig = tpl.figure()
-            fig.plot(
-                np.log10(lr_find_lr),
-                lr_find_loss,
-                width=50,
-                height=30,
-                xlabel="Log10 Learning Rate",
-            )
-            fig.show()
-
-        return lr_find_loss, lr_find_lr
-
-    def find_appropriate_lr(self, lr_find_loss: torch.Tensor, lr_find_lr: torch.Tensor) -> float:
-        """Calculates learning rate corresponsing to minimum gradient in graph
-        of loss vs learning rate.
-
-        Args:
-            lr_find_loss (torch.Tensor): Loss values accumulated during training
-            lr_find_lr (torch.Tensor): Learning rate used for mini-batch
-
-        Returns:
-            float: The learning rate at the point when loss was falling most steeply
-        """
-        default_min_lr = 0.00075  # Add as default value to fix bug
-        # Get loss values and their corresponding gradients, and get lr values
-        for i in range(0, len(lr_find_loss)):
-            if lr_find_loss[i].is_cuda:
-                lr_find_loss[i] = lr_find_loss[i].cpu()
-            lr_find_loss[i] = lr_find_loss[i].detach().numpy()
-        losses = np.array(lr_find_loss)
-        try:
-            min_loss_grad_idx = (np.gradient(losses)).argmin()
-        except:
-            logging.info("Failed to compute gradients, returning default value.")
-            return default_min_lr
-        min_lr = lr_find_lr[min_loss_grad_idx]
-        return min_lr
-
     def train_model(self, output_path, num_epochs, patience):
         """Performs training of model for a number of cycles
         with a learning rate that is determined automatically.
@@ -188,41 +117,14 @@ class Unet2dTrainer:
         self.avg_valid_losses = []  #  per epoch validation loss
         self.avg_eval_scores = []  #  per epoch evaluation score
 
-        def lr_exp_stepper(x):
-            """Exponentially increase learning rate as part of strategy to find the
-            optimum.
-            Taken from
-            https://towardsdatascience.com/adaptive-and-cyclical-learning-rates-using-pytorch-2bf904d18dee
-            """
-            return math.exp(
-                x
-                * self.log_lr_ratio
-                / (self.lr_find_epochs * len(self.training_loader))
-            )
-
-        logging.info("Finding learning rate for model.")
-        lr_scheduler = torch.optim.lr_scheduler.LambdaLR(self.optimizer, lr_exp_stepper)
-        lr_find_loss, lr_find_lr = self.lr_finder(lr_scheduler)
-        lr_to_use = self.find_appropriate_lr(lr_find_loss, lr_find_lr)
-        logging.info(f"LR to use {lr_to_use}")
+        lr_to_use = self.run_lr_finder()
         # Recreate model and start training
         logging.info("Recreating the U-net and optimizer.")
         self.model = create_unet_on_device(self.model_device_num, self.model_struc_dict)
         self.optimizer = self.create_optimizer(lr_to_use)
-        early_stopping = EarlyStopping(
-            patience=patience,
-            verbose=True,
-            path=output_path,
-            model_dict=self.model_struc_dict,
-        )
+        early_stopping = self.create_early_stopping(output_path, patience)
         # Initialise the One Cycle learning rate scheduler
-        lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(
-            self.optimizer,
-            max_lr=lr_to_use,
-            steps_per_epoch=len(self.training_loader),
-            epochs=num_epochs,
-            pct_start=0.5,
-        )
+        lr_scheduler = self.create_oc_lr_scheduler(num_epochs, lr_to_use)
 
         for epoch in range(1, num_epochs + 1):
             self.model.train()
@@ -282,6 +184,117 @@ class Unet2dTrainer:
         # load the last checkpoint with the best model
         model_dict = torch.load(output_path, map_location="cpu")
         self.model.load_state_dict(model_dict["model_state_dict"])
+
+    def run_lr_finder(self):
+        logging.info("Finding learning rate for model.")
+        lr_scheduler = self.create_exponential_lr_scheduler()
+        lr_find_loss, lr_find_lr = self.lr_finder(lr_scheduler)
+        lr_to_use = self.find_lr_from_graph(lr_find_loss, lr_find_lr)
+        logging.info(f"LR to use {lr_to_use}")
+        return lr_to_use
+
+    def lr_finder(self, lr_scheduler, smoothing=0.05, plt_fig=True):
+        lr_find_loss = []
+        lr_find_lr = []
+        iters = 0
+
+        self.model.train()
+        print(
+            f"Training for {self.lr_find_epochs} epochs to create a learning "
+            "rate plot."
+        )
+        for i in range(self.lr_find_epochs):
+            for batch in tqdm(
+                self.training_loader,
+                desc=f"Epoch {i + 1}, batch number",
+                bar_format=BAR_FORMAT,
+            ):
+                loss = self.train_one_batch(lr_scheduler, batch)
+                lr_step = self.optimizer.state_dict()["param_groups"][0]["lr"]
+                lr_find_lr.append(lr_step)
+                if iters == 0:
+                    lr_find_loss.append(loss)
+                else:
+                    loss = smoothing * loss + (1 - smoothing) * lr_find_loss[-1]
+                    lr_find_loss.append(loss)
+                if loss > 1 and iters > len(self.training_loader) // 1.333:
+                    break
+                iters += 1
+
+        if plt_fig:
+            fig = tpl.figure()
+            fig.plot(
+                np.log10(lr_find_lr),
+                lr_find_loss,
+                width=50,
+                height=30,
+                xlabel="Log10 Learning Rate",
+            )
+            fig.show()
+
+        return lr_find_loss, lr_find_lr
+
+    @staticmethod
+    def find_lr_from_graph(
+        lr_find_loss: torch.Tensor, lr_find_lr: torch.Tensor
+    ) -> float:
+        """Calculates learning rate corresponsing to minimum gradient in graph
+        of loss vs learning rate.
+
+        Args:
+            lr_find_loss (torch.Tensor): Loss values accumulated during training
+            lr_find_lr (torch.Tensor): Learning rate used for mini-batch
+
+        Returns:
+            float: The learning rate at the point when loss was falling most steeply
+        """
+        default_min_lr = 0.00075  # Add as default value to fix bug
+        # Get loss values and their corresponding gradients, and get lr values
+        for i in range(0, len(lr_find_loss)):
+            if lr_find_loss[i].is_cuda:
+                lr_find_loss[i] = lr_find_loss[i].cpu()
+            lr_find_loss[i] = lr_find_loss[i].detach().numpy()
+        losses = np.array(lr_find_loss)
+        try:
+            min_loss_grad_idx = (np.gradient(losses)).argmin()
+        except:
+            logging.info("Failed to compute gradients, returning default value.")
+            return default_min_lr
+        min_lr = lr_find_lr[min_loss_grad_idx]
+        return min_lr
+
+    def lr_exp_stepper(self, x):
+        """Exponentially increase learning rate as part of strategy to find the
+        optimum.
+        Taken from
+        https://towardsdatascience.com/adaptive-and-cyclical-learning-rates-using-pytorch-2bf904d18dee
+        """
+        return math.exp(
+            x * self.log_lr_ratio / (self.lr_find_epochs * len(self.training_loader))
+        )
+
+    def create_optimizer(self, learning_rate):
+        return torch.optim.AdamW(self.model.parameters(), lr=learning_rate)
+
+    def create_exponential_lr_scheduler(self):
+        return torch.optim.lr_scheduler.LambdaLR(self.optimizer, self.lr_exp_stepper)
+
+    def create_oc_lr_scheduler(self, num_epochs, lr_to_use):
+        return torch.optim.lr_scheduler.OneCycleLR(
+            self.optimizer,
+            max_lr=lr_to_use,
+            steps_per_epoch=len(self.training_loader),
+            epochs=num_epochs,
+            pct_start=0.5,
+        )
+
+    def create_early_stopping(self, output_path, patience):
+        return EarlyStopping(
+            patience=patience,
+            verbose=True,
+            path=output_path,
+            model_dict=self.model_struc_dict,
+        )
 
     def train_one_batch(self, lr_scheduler, batch):
         inputs, targets = self.prepare_batch(batch, self.model_device_num)
@@ -345,15 +358,15 @@ class Unet2dTrainer:
         fromthe validation dataset along with the corresponding ground truth
         label image and corresponding prediction output from the model attached
         to this class instance. The image is saved to the same directory as the
-        model weights. 
+        model weights.
 
         Args:
             model_path (pathlib.Path): Full path to the model weights file,
-            this is used to get the directory and name of the model not to 
+            this is used to get the directory and name of the model not to
             load and predict.
         """
         self.model.eval()  # prep model for evaluation
-        batch = next(iter(self.validation_loader)) # Get first batch
+        batch = next(iter(self.validation_loader))  # Get first batch
         with torch.no_grad():
             inputs, targets = self.prepare_batch(batch, self.model_device_num)
             output = self.model(inputs)  # Forward pass
@@ -370,22 +383,22 @@ class Unet2dTrainer:
         fig = plt.figure(figsize=(12, 16))
         columns = 3
         j = 0
-        for i in range(columns*rows)[::3]:
+        for i in range(columns * rows)[::3]:
             img = inputs[j].squeeze().cpu()
             gt = torch.argmax(targets[j], dim=0).cpu()
             pred = labels[j].cpu()
             col1 = fig.add_subplot(rows, columns, i + 1)
-            plt.imshow(img, cmap='gray')
+            plt.imshow(img, cmap="gray")
             col2 = fig.add_subplot(rows, columns, i + 2)
-            plt.imshow(gt, cmap='gray')
+            plt.imshow(gt, cmap="gray")
             col3 = fig.add_subplot(rows, columns, i + 3)
-            plt.imshow(pred, cmap='gray')
+            plt.imshow(pred, cmap="gray")
             j += 1
             if i == 0:
-                col1.title.set_text('Data')
-                col2.title.set_text('Ground Truth')
-                col3.title.set_text('Prediction')
+                col1.title.set_text("Data")
+                col2.title.set_text("Ground Truth")
+                col3.title.set_text("Prediction")
         plt.suptitle(f"Predictions for {model_path.name}", fontsize=16)
-        plt_out_pth = model_path.parent/f'{model_path.stem}_prediction_image.png'
+        plt_out_pth = model_path.parent / f"{model_path.stem}_prediction_image.png"
         logging.info(f"Saving example image predictions to {plt_out_pth}")
         plt.savefig(plt_out_pth, dpi=300)
