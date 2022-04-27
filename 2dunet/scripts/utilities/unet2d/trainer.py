@@ -10,14 +10,14 @@ import termplotlib as tpl
 
 mpl.use("Agg")
 import torch
+import utilities.config as cfg
 from matplotlib import pyplot as plt
 from pytorch3dunet.unet3d.losses import BCEDiceLoss, DiceLoss, GeneralizedDiceLoss
 from pytorch3dunet.unet3d.metrics import GenericAveragePrecision, MeanIoU
 from torch import nn as nn
 from tqdm import tqdm
-
-from utilities.unet2d.model import create_unet_on_device
 from utilities.early_stopping import EarlyStopping
+from utilities.unet2d.model import create_unet_on_device
 
 BAR_FORMAT = "{l_bar}{bar: 30}{r_bar}{bar: -30b}"  # tqdm progress bar
 
@@ -38,21 +38,55 @@ class Unet2dTrainer:
         # Params for learning rate finder
         self.starting_lr = float(settings.starting_lr)
         self.end_lr = float(settings.end_lr)
-        self.log_lr_ratio = math.log(self.end_lr / self.starting_lr)
+        self.log_lr_ratio = self.calculate_log_lr_ratio()
         self.lr_find_epochs = settings.lr_find_epochs
+        self.lr_reduce_factor = settings.lr_reduce_factor
         # Params for model training
         self.model_device_num = int(settings.cuda_device)
-        self.num_epochs = settings.num_epochs
         self.patience = settings.patience
         self.loss_criterion = self.get_loss_criterion()
         self.eval_metric = self.get_eval_metric()
         self.model_struc_dict = settings.model
         self.model_struc_dict["classes"] = self.label_no
-        # Set up model ready for training
-        logging.info(f"Setting up the model on device {settings.cuda_device}.")
+        self.avg_train_losses = []  # per epoch training loss
+        self.avg_valid_losses = []  #  per epoch validation loss
+        self.avg_eval_scores = []  #  per epoch evaluation score
+
+    def calculate_log_lr_ratio(self):
+        return math.log(self.end_lr / self.starting_lr)
+
+    def create_unet_and_optimiser(self, learning_rate, frozen=False):
+        logging.info(f"Setting up the model on device {self.settings.cuda_device}.")
         self.model = create_unet_on_device(self.model_device_num, self.model_struc_dict)
-        self.optimizer = self.create_optimizer(self.starting_lr)
+        if frozen:
+            self.freeze_model()
+        logging.info(
+            f"Model has {self.count_trainable_parameters()} trainable parameters, {self.count_parameters()} total parameters."
+        )
+        self.optimizer = self.create_optimizer(learning_rate)
         logging.info("Trainer created.")
+
+    def freeze_model(self):
+        logging.info(
+            f"Freezing model with {self.count_trainable_parameters()} trainable parameters, {self.count_parameters()} total parameters."
+        )
+        for name, param in self.model.named_parameters():
+            if all(["encoder" in name, "conv" in name]) and param.requires_grad:
+                param.requires_grad = False
+
+    def unfreeze_model(self):
+        logging.info(
+            f"Unfreezing model with {self.count_trainable_parameters()} trainable parameters, {self.count_parameters()} total parameters."
+        )
+        for name, param in self.model.named_parameters():
+            if all(["encoder" in name, "conv" in name]) and not param.requires_grad:
+                param.requires_grad = True
+
+    def count_trainable_parameters(self) -> int:
+        return sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+
+    def count_parameters(self) -> int:
+        return sum(p.numel() for p in self.model.parameters())
 
     def get_loss_criterion(self):
         if self.settings.loss_criterion == "BCEDiceLoss":
@@ -106,23 +140,36 @@ class Unet2dTrainer:
         targets = torch.stack(channels, 1).to(device, dtype=torch.uint8)
         return inputs, targets
 
-    def train_model(self, output_path, num_epochs, patience):
+    def train_model(self, output_path, num_epochs, patience, create=True, frozen=False):
         """Performs training of model for a number of cycles
         with a learning rate that is determined automatically.
         """
         train_losses = []
         valid_losses = []
         eval_scores = []
-        self.avg_train_losses = []  # per epoch training loss
-        self.avg_valid_losses = []  #  per epoch validation loss
-        self.avg_eval_scores = []  #  per epoch evaluation score
 
-        lr_to_use = self.run_lr_finder()
-        # Recreate model and start training
-        logging.info("Recreating the U-net and optimizer.")
-        self.model = create_unet_on_device(self.model_device_num, self.model_struc_dict)
-        self.optimizer = self.create_optimizer(lr_to_use)
-        early_stopping = self.create_early_stopping(output_path, patience)
+        if create:
+            self.create_unet_and_optimiser(self.starting_lr, frozen=frozen)
+            lr_to_use = self.run_lr_finder()
+            # Recreate model and start training
+            self.create_unet_and_optimiser(lr_to_use, frozen=frozen)
+            early_stopping = self.create_early_stopping(output_path, patience)
+        else:
+            # Reduce starting LR, since model alreadiy partiallly trained
+            self.starting_lr /= self.lr_reduce_factor
+            self.end_lr /= self.lr_reduce_factor
+            self.log_lr_ratio = self.calculate_log_lr_ratio()
+            self.load_in_unet_and_optimizer(
+                self.starting_lr, output_path, frozen=frozen, optimizer=False
+            )
+            lr_to_use = self.run_lr_finder()
+            min_loss = self.load_in_unet_and_optimizer(
+                self.starting_lr, output_path, frozen=frozen, optimizer=False
+            )
+            early_stopping = self.create_early_stopping(
+                output_path, patience, best_score=-min_loss
+            )
+
         # Initialise the One Cycle learning rate scheduler
         lr_scheduler = self.create_oc_lr_scheduler(num_epochs, lr_to_use)
 
@@ -173,17 +220,38 @@ class Unet2dTrainer:
             valid_losses = []
             eval_scores = []
 
-            # early_stopping needs the validation loss to check if it has decresed,
+            # early_stopping needs the validation loss to check if it has decreased,
             # and if it has, it will make a checkpoint of the current model
-            early_stopping(self.avg_valid_losses[-1], self.model)
+            early_stopping(self.avg_valid_losses[-1], self.model, self.optimizer)
 
             if early_stopping.early_stop:
                 logging.info("Early stopping")
                 break
 
         # load the last checkpoint with the best model
-        model_dict = torch.load(output_path, map_location="cpu")
+        self.load_in_weights(output_path)
+
+    def load_in_unet_and_optimizer(
+        self, learning_rate, output_path, frozen=False, optimizer=False
+    ):
+        self.create_unet_and_optimiser(learning_rate, frozen=frozen)
+        logging.info("Loading in weights from saved checkpoint.")
+        loss_val = self.load_in_weights(output_path, optimizer=optimizer)
+        return loss_val
+
+    def load_in_weights(self, output_path, optimizer=False, gpu=True):
+        # load the last checkpoint with the best model
+        if gpu:
+            map_location = f"cuda:{self.model_device_num}"
+        else:
+            map_location = "cpu"
+        model_dict = torch.load(output_path, map_location=map_location)
+        logging.info("Loading model weights.")
         self.model.load_state_dict(model_dict["model_state_dict"])
+        if optimizer:
+            logging.info("Loading optimizer weights.")
+            self.optimizer.load_state_dict(model_dict["optimizer_state_dict"])
+        return model_dict.get("loss_val", np.inf)
 
     def run_lr_finder(self):
         logging.info("Finding learning rate for model.")
@@ -248,7 +316,7 @@ class Unet2dTrainer:
         Returns:
             float: The learning rate at the point when loss was falling most steeply
         """
-        default_min_lr = 0.00075  # Add as default value to fix bug
+        default_min_lr = cfg.DEFAULT_MIN_LR  # Add as default value to fix bug
         # Get loss values and their corresponding gradients, and get lr values
         for i in range(0, len(lr_find_loss)):
             if lr_find_loss[i].is_cuda:
@@ -285,15 +353,16 @@ class Unet2dTrainer:
             max_lr=lr_to_use,
             steps_per_epoch=len(self.training_loader),
             epochs=num_epochs,
-            pct_start=0.5,
+            pct_start=self.settings.pct_lr_inc,
         )
 
-    def create_early_stopping(self, output_path, patience):
+    def create_early_stopping(self, output_path, patience, best_score=None):
         return EarlyStopping(
             patience=patience,
             verbose=True,
             path=output_path,
             model_dict=self.model_struc_dict,
+            best_score=best_score,
         )
 
     def train_one_batch(self, lr_scheduler, batch):

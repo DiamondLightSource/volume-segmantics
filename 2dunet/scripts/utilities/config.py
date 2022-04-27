@@ -27,3 +27,5 @@ BIG_CUDA_BATCH = 16 # Size of batch on big GPU
 SMALL_CUDA_BATCH = 4 # Size of batch on small GPU
 NUM_WORKERS = 8 # Number of parallel workers for dataloaders
 PIN_CUDA_MEMORY = True # Whether to pin CUDA memory for faster data transfer 
+
+DEFAULT_MIN_LR = 0.00075 # Learning rate to return if LR finder fails
