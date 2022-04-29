@@ -6,16 +6,16 @@ from pathlib import Path
 import numpy as np
 from skimage import img_as_ubyte, io
 from tqdm import tqdm
+from utilities.base_data_manager import BaseDataManager
 from utilities.base_data_utils import (
     axis_index_to_slice,
-    downsample_data,
     get_axis_index_pairs,
     get_num_of_ims,
     get_numpy_from_path,
 )
 
 
-class TrainingDataSlicer:
+class TrainingDataSlicer(BaseDataManager):
     """Class that converts 3d data volumes into 2d image slices on disk for
     model training.
     Slicing is carried in all of the xy (z), xz (y) and yz (x) planes.
@@ -25,36 +25,16 @@ class TrainingDataSlicer:
     """
 
     def __init__(self, settings, data_vol_path, label_vol_path):
-        self.input_data_chunking = None
+        super().__init__(data_vol_path, settings)
         self.data_im_out_dir = None
         self.seg_im_out_dir = None
         self.multilabel = False
         self.settings = settings
-        self.data_vol_path = Path(data_vol_path)
         self.label_vol_path = Path(label_vol_path)
-        self.data_vol = get_numpy_from_path(
-            self.data_vol_path, internal_path=settings.train_data_hdf5_path
-        )
         self.seg_vol = get_numpy_from_path(
             self.label_vol_path, internal_path=settings.seg_hdf5_path
         )
-        self.st_dev_factor = settings.st_dev_factor
-        self.downsample = settings.downsample
-        self.preprocess_data()
         self.preprocess_labels()
-
-    def preprocess_data(self):
-        if self.downsample:
-            self.data_vol = downsample_data(self.data_vol)
-        self.data_vol_shape = self.data_vol.shape
-        logging.info("Calculating mean of data...")
-        self.data_mean = np.nanmean(self.data_vol)
-        logging.info(f"Mean value: {self.data_mean}")
-        if self.settings.clip_data:
-            self.data_vol = self.clip_to_uint8(self.data_vol)
-        if np.isnan(self.data_vol).any():
-            logging.info(f"Replacing NaN values.")
-            self.data_vol = np.nan_to_num(self.data_vol, copy=False)
 
     def preprocess_labels(self):
         seg_classes = np.unique(self.seg_vol)

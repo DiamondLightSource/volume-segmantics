@@ -1,5 +1,6 @@
 import logging
 import sys
+from enum import Enum
 from itertools import chain, product
 
 import h5py as h5
@@ -10,6 +11,12 @@ from skimage.measure import block_reduce
 
 from utilities import config as cfg
 from utilities.settingsdata import SettingsData
+
+
+class Quality(Enum):
+    LOW = 1
+    MEDIUM = 3
+    HIGH = 12
 
 
 def get_batch_size(settings: SettingsData) -> int:
@@ -99,7 +106,7 @@ def get_numpy_from_path(path, internal_path="/data"):
         return numpy_from_hdf5(path, hdf5_path=internal_path, nexus=nexus)
 
 
-def clip_to_uint8(self, data):
+def clip_to_uint8(data: np.array, data_mean: float, st_dev_factor: float) -> np.array:
     """Clips data to a certain number of st_devs of the mean and reduces
     bit depth to uint8.
 
@@ -113,11 +120,9 @@ def clip_to_uint8(self, data):
     logging.info(f"Calculating standard deviation.")
     data_st_dev = np.nanstd(data)
     logging.info(f"Std dev: {data_st_dev}. Calculating stats.")
-    # diff_mat = np.ravel(data - self.data_mean)
-    # data_st_dev = np.sqrt(np.dot(diff_mat, diff_mat)/data.size)
     num_vox = data.size
-    lower_bound = self.data_mean - (data_st_dev * self.st_dev_factor)
-    upper_bound = self.data_mean + (data_st_dev * self.st_dev_factor)
+    lower_bound = data_mean - (data_st_dev * st_dev_factor)
+    upper_bound = data_mean + (data_st_dev * st_dev_factor)
     with np.errstate(invalid="ignore"):
         gt_ub = (data > upper_bound).sum()
         lt_lb = (data < lower_bound).sum()
@@ -130,7 +135,7 @@ def clip_to_uint8(self, data):
     )
     if np.isnan(data).any():
         logging.info(f"Replacing NaN values.")
-        data = np.nan_to_num(data, copy=False, nan=self.data_mean)
+        data = np.nan_to_num(data, copy=False, nan=data_mean)
     logging.info("Rescaling intensities.")
     if np.issubdtype(data.dtype, np.integer):
         logging.info(

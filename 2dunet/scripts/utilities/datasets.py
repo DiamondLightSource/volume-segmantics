@@ -7,6 +7,7 @@ from torch.utils.data import Dataset as BaseDataset
 
 from utilities import augmentations as augs
 from utilities.settingsdata import SettingsData
+import utilities.config as cfg
 
 
 class Unet2dDataset(BaseDataset):
@@ -26,8 +27,8 @@ class Unet2dDataset(BaseDataset):
 
     """
 
-    imagenet_mean = 0.449
-    imagenet_std = 0.226
+    imagenet_mean = cfg.IMAGENET_MEAN
+    imagenet_std = cfg.IMAGENET_STD
 
     def __init__(
         self,

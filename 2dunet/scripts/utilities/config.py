@@ -11,7 +11,7 @@ TIFF_SUFFIXES = {".tiff", ".tif"}
 HDF5_SUFFIXES = {".h5", ".hdf5", ".nxs"}
 TRAIN_DATA_EXT = {*HDF5_SUFFIXES, *TIFF_SUFFIXES}
 LABEL_DATA_EXT = {*HDF5_SUFFIXES, *TIFF_SUFFIXES}
-MODEL_DATA_EXT = {".zip"}
+MODEL_DATA_EXT = {".pytorch", ".pth"}
 PREDICT_DATA_EXT = {*HDF5_SUFFIXES, *TIFF_SUFFIXES}
 # TODO Required settings - check required keys are in settings files
 # Logging format
@@ -25,7 +25,11 @@ PREDICTION_SETTINGS_FN = "2d_unet_predict_settings.yaml"
 BIG_CUDA_SIZE = 8 # GPU Memory (GB), above this value batch size is increased
 BIG_CUDA_BATCH = 16 # Size of batch on big GPU
 SMALL_CUDA_BATCH = 4 # Size of batch on small GPU
-NUM_WORKERS = 8 # Number of parallel workers for dataloaders
+NUM_WORKERS = 8 # Number of parallel workers for training/validation dataloaders
 PIN_CUDA_MEMORY = True # Whether to pin CUDA memory for faster data transfer 
 
 DEFAULT_MIN_LR = 0.00075 # Learning rate to return if LR finder fails
+
+IMAGENET_MEAN = 0.449 # Mean value for single channel imagnet normalisation
+IMAGENET_STD = 0.226 # Standard deviation for single channel imagenet normalisation
+ 
