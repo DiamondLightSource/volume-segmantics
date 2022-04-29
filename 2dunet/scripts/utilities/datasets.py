@@ -87,6 +87,63 @@ class Unet2dDataset(BaseDataset):
             int(t) if t.isdigit() else t.lower() for t in re.split("(\d+)", str(item))
         ]
 
+class Unet2dPredictionDataset(BaseDataset):
+    """Splits 3D data volume into 2D images for inference.
+
+    Args:
+        images_dir (pathlib.Path): path to images folder
+        masks_dir (pathlib.Path): path to segmentation masks folder
+        preprocessing (albumentations.Compose): data pre-processing
+            (e.g. padding, resizing)
+        imagenet_norm (bool): Whether to normalise according to imagenet stats
+        postprocessing (albumentations.Compose): data post-processing
+            (e.g. Convert to Tensor)
+
+
+    """
+
+    imagenet_mean = cfg.IMAGENET_MEAN
+    imagenet_std = cfg.IMAGENET_STD
+
+    def __init__(
+        self,
+        data_vol,
+        preprocessing=None,
+        imagenet_norm=True,
+        postprocessing=None,
+    ):
+        self.data_vol = data_vol
+        self.preprocessing = preprocessing
+        self.imagenet_norm = imagenet_norm
+        self.postprocessing = postprocessing
+
+    def __getitem__(self, i):
+
+        image = self.data_vol[i]
+
+        # apply pre-processing
+        if self.preprocessing:
+            sample = self.preprocessing(image=image)
+            image = sample["image"]
+
+        if self.imagenet_norm:
+            if np.issubdtype(image.dtype, np.integer):
+                # Convert to float
+                image = image.astype(np.float32)
+                image = image / 255
+            image = image - self.imagenet_mean
+            image = image / self.imagenet_std
+
+        # apply post-processing
+        if self.postprocessing:
+            sample = self.postprocessing(image=image)
+            image = sample["image"]
+
+        return image
+
+    def __len__(self):
+        return self.data_vol.shape[0]
+
 
 def get_2d_training_dataset(
     image_dir: Path, label_dir: Path, settings: SettingsData

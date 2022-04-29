@@ -2,16 +2,16 @@
 
 import argparse
 import logging
-import os
-from torch.cuda import set_device
 import warnings
 from pathlib import Path
 
 from utilities import config as cfg
 from utilities.cmdline import CheckExt
-from utilities.data import (PredictionDataSlicer, PredictionHDF5DataSlicer,
-                            SettingsData)
-from utilities.unet2d import Unet2dPredictor
+from utilities.settingsdata import SettingsData
+# from utilities.data import (PredictionDataSlicer, PredictionHDF5DataSlicer,
+#                             SettingsData)
+from utilities.unet2d.predictor import Unet2dPredictor
+from utilities.unet2d.prediction_manager import Unet2DPredictionManager
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -46,25 +46,14 @@ if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO, format=cfg.LOGGING_FMT,
         datefmt=cfg.LOGGING_DATE_FMT)
-    # Set up the settings
     parser = init_argparse()
     args = parser.parse_args()
     root_path = Path(getattr(args, cfg.DATA_DIR_ARG)).resolve()
     settings_path = Path(root_path, cfg.SETTINGS_DIR,
                          cfg.PREDICTION_SETTINGS_FN)
     settings = SettingsData(settings_path)
-    # Select the requested GPU
-    logging.info(f"Setting CUDA device {settings.cuda_device}")
-    set_device(f'cuda:{settings.cuda_device}')
-    # os.environ['CUDA_VISIBLE_DEVICES'] = str(settings.cuda_device)
-    # Create a model from the saved .zip file
     model_file_path = getattr(args, cfg.MODEL_PTH_ARG)
-    predictor = Unet2dPredictor(root_path)
-    predictor.create_model_from_zip(Path(model_file_path))
-    # Create a slicer to slice and predict the segmentations from the data
+    predictor = Unet2dPredictor(model_file_path, settings)
     data_vol_path = getattr(args, cfg.PREDICT_DATA_ARG)
-    if settings.use_max_probs:
-        slicer = PredictionHDF5DataSlicer(settings, predictor, data_vol_path)
-    else:
-        slicer = PredictionDataSlicer(settings, predictor, data_vol_path)
-    slicer.predict_12_ways(root_path)
+    pred_manager = Unet2DPredictionManager(predictor, data_vol_path, settings)
+    pred_manager.predict_volume()
