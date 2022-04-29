@@ -4,12 +4,18 @@ import os
 from pathlib import Path
 
 import numpy as np
-from skimage import img_as_float, img_as_ubyte, io
+from skimage import img_as_ubyte, io
 from tqdm import tqdm
-from utilities.slicers.slicerbase import DataSlicerBase
+from utilities.base_data_utils import (
+    axis_index_to_slice,
+    downsample_data,
+    get_axis_index_pairs,
+    get_num_of_ims,
+    get_numpy_from_path,
+)
 
 
-class TrainingDataSlicer(DataSlicerBase):
+class TrainingDataSlicer:
     """Class that converts 3d data volumes into 2d image slices on disk for
     model training.
     Slicing is carried in all of the xy (z), xz (y) and yz (x) planes.
@@ -19,23 +25,45 @@ class TrainingDataSlicer(DataSlicerBase):
     """
 
     def __init__(self, settings, data_vol_path, label_vol_path):
-        self.data_vol_path = Path(data_vol_path)
-        self.data_vol = self.get_numpy_from_path(self.data_vol_path,
-        										 internal_path=settings.train_data_hdf5_path)
-       
-        super().__init__(settings)
-        self.multilabel = False
+        self.input_data_chunking = None
         self.data_im_out_dir = None
         self.seg_im_out_dir = None
-        label_vol_path = Path(label_vol_path)
-        self.seg_vol = self.get_numpy_from_path(label_vol_path,
-                                         internal_path=settings.seg_hdf5_path)
+        self.multilabel = False
+        self.settings = settings
+        self.data_vol_path = Path(data_vol_path)
+        self.label_vol_path = Path(label_vol_path)
+        self.data_vol = get_numpy_from_path(
+            self.data_vol_path, internal_path=settings.train_data_hdf5_path
+        )
+        self.seg_vol = get_numpy_from_path(
+            self.label_vol_path, internal_path=settings.seg_hdf5_path
+        )
+        self.st_dev_factor = settings.st_dev_factor
+        self.downsample = settings.downsample
+        self.preprocess_data()
+        self.preprocess_labels()
+
+    def preprocess_data(self):
+        if self.downsample:
+            self.data_vol = downsample_data(self.data_vol)
+        self.data_vol_shape = self.data_vol.shape
+        logging.info("Calculating mean of data...")
+        self.data_mean = np.nanmean(self.data_vol)
+        logging.info(f"Mean value: {self.data_mean}")
+        if self.settings.clip_data:
+            self.data_vol = self.clip_to_uint8(self.data_vol)
+        if np.isnan(self.data_vol).any():
+            logging.info(f"Replacing NaN values.")
+            self.data_vol = np.nan_to_num(self.data_vol, copy=False)
+
+    def preprocess_labels(self):
         seg_classes = np.unique(self.seg_vol)
         self.num_seg_classes = len(seg_classes)
         if self.num_seg_classes > 2:
             self.multilabel = True
-        logging.info("Number of classes in segmentation dataset:"
-                     f" {self.num_seg_classes}")
+        logging.info(
+            "Number of classes in segmentation dataset:" f" {self.num_seg_classes}"
+        )
         logging.info(f"These classes are: {seg_classes}")
         if seg_classes[0] != 0:
             logging.info("Fixing label classes.")
@@ -59,8 +87,7 @@ class TrainingDataSlicer(DataSlicerBase):
             data_dir (pathlib.Path): The path to the directory where images will be saved.
         """
         self.data_im_out_dir = data_dir
-        logging.info(
-            'Slicing data volume and saving slices to disk')
+        logging.info("Slicing data volume and saving slices to disk")
         os.makedirs(data_dir, exist_ok=True)
         self.output_slices_to_disk(self.data_vol, data_dir, prefix)
 
@@ -71,32 +98,29 @@ class TrainingDataSlicer(DataSlicerBase):
             data_dir (pathlib.Path): The path to the directory where images will be saved.
         """
         self.seg_im_out_dir = data_dir
-        logging.info(
-            'Slicing label volume and saving slices to disk')
+        logging.info("Slicing label volume and saving slices to disk")
         os.makedirs(data_dir, exist_ok=True)
-        self.output_slices_to_disk(
-            self.seg_vol, data_dir, prefix, label=True)
+        self.output_slices_to_disk(self.seg_vol, data_dir, prefix, label=True)
 
     def output_slices_to_disk(self, data_arr, output_path, name_prefix, label=False):
         """Coordinates the slicing of an image volume in the three orthogonal
-        planes to images on disk. 
-        
+        planes to images on disk.
+
         Args:
             data_arr (array): The data volume to be sliced.
             output_path (pathlib.Path): A Path object to the output directory.
             label (bool): Whether this is a label volume.
         """
         shape_tup = data_arr.shape
-        ax_idx_pairs = self.get_axis_index_pairs(shape_tup)
-        num_ims = self.get_num_of_ims(shape_tup)
+        ax_idx_pairs = get_axis_index_pairs(shape_tup)
+        num_ims = get_num_of_ims(shape_tup)
         for axis, index in tqdm(ax_idx_pairs, total=num_ims):
-            out_path = output_path/f"{name_prefix}_{axis}_stack_{index}"
-            self.output_im(self.axis_index_to_slice(data_arr, axis, index),
-                           out_path, label)
+            out_path = output_path / f"{name_prefix}_{axis}_stack_{index}"
+            self.output_im(axis_index_to_slice(data_arr, axis, index), out_path, label)
 
     def output_im(self, data, path, label=False):
         """Converts a slice of data into an image on disk.
-    
+
         Args:
             data (numpy.array): The data slice to be converted.
             path (str): The path of the image file including the filename prefix.
@@ -107,7 +131,7 @@ class TrainingDataSlicer(DataSlicerBase):
                 data = img_as_ubyte(data)
             if not self.multilabel:
                 data[data > 1] = 1
-        io.imsave(f'{path}.png', data)
+        io.imsave(f"{path}.png", data)
 
     def delete_data_im_slices(self):
         """Deletes image slices in the data image output directory. Leaves the
@@ -132,7 +156,6 @@ class TrainingDataSlicer(DataSlicerBase):
             os.rmdir(self.seg_im_out_dir)
 
     def clean_up_slices(self):
-        """Wrapper function that cleans up data and label image slices.
-        """
+        """Wrapper function that cleans up data and label image slices."""
         self.delete_data_im_slices()
         self.delete_label_im_slices()
