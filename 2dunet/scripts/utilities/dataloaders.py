@@ -7,7 +7,11 @@ from torch.utils.data import DataLoader, Subset
 
 from utilities import base_data_utils as utils
 from utilities import config as cfg
-from utilities.datasets import get_2d_training_dataset, get_2d_validation_dataset
+from utilities.datasets import (
+    get_2d_training_dataset,
+    get_2d_validation_dataset,
+    get_2d_prediction_dataset,
+)
 from utilities.settingsdata import SettingsData
 
 
@@ -53,3 +57,17 @@ def get_2d_training_dataloaders(
         pin_memory=cfg.PIN_CUDA_MEMORY,
     )
     return training_dataloader, validation_dataloader
+
+
+def get_2d_prediction_dataloader(
+    data_vol: np.array, settings: SettingsData
+) -> DataLoader:
+    pred_dataset = get_2d_prediction_dataset(data_vol)
+    batch_size = utils.get_batch_size(settings)
+    return DataLoader(
+        pred_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=0,  # Set to 0 for prediction
+        pin_memory=cfg.PIN_CUDA_MEMORY,
+    )

@@ -3,6 +3,7 @@ from pathlib import Path
 
 from utilities.settingsdata import SettingsData
 from utilities.unet2d.model import create_unet_from_file
+from utilities.dataloaders import get_2d_prediction_dataloader
 
 
 class Unet2dPredictor:
@@ -18,4 +19,5 @@ class Unet2dPredictor:
         self.model = trainer.model
 
     def predict_single_axis(self, data_vol):
-        data_loader = 0
+        data_loader = get_2d_prediction_dataloader(data_vol, self.settings)
+        print(next(iter(data_loader)).shape)

@@ -87,6 +87,7 @@ class Unet2dDataset(BaseDataset):
             int(t) if t.isdigit() else t.lower() for t in re.split("(\d+)", str(item))
         ]
 
+
 class Unet2dPredictionDataset(BaseDataset):
     """Splits 3D data volume into 2D images for inference.
 
@@ -168,5 +169,13 @@ def get_2d_validation_dataset(
         image_dir,
         label_dir,
         preprocessing=augs.get_preprocess_augs(img_size),
+        postprocessing=augs.get_postprocess_augs(),
+    )
+
+
+def get_2d_prediction_dataset(data_vol: np.array) -> Unet2dPredictionDataset:
+
+    return Unet2dPredictionDataset(
+        data_vol,
         postprocessing=augs.get_postprocess_augs(),
     )
