@@ -8,7 +8,7 @@ from pathlib import Path
 
 import utilities.config as cfg
 from utilities.cmdline import CheckExt
-from utilities.dataloaders import get_2d_dataloaders
+from utilities.dataloaders import get_2d_training_dataloaders
 from utilities.settingsdata import SettingsData
 from utilities.slicers.trainingslicers import TrainingDataSlicer
 from utilities.unet2d.trainer import Unet2dTrainer
@@ -92,7 +92,7 @@ if __name__ == "__main__":
             label_codes = slicer.codes
     assert label_codes is not None
     # Set up the DataLoader to load in and augment the data
-    train_loader, valid_loader = get_2d_dataloaders(
+    train_loader, valid_loader = get_2d_training_dataloaders(
         data_im_out_dir, seg_im_out_dir, settings
     )
     # Set up the UnetTrainer

@@ -11,7 +11,7 @@ from utilities.datasets import get_2d_training_dataset, get_2d_validation_datase
 from utilities.settingsdata import SettingsData
 
 
-def get_2d_dataloaders(
+def get_2d_training_dataloaders(
     image_dir: Path, label_dir: Path, settings: SettingsData
 ) -> Tuple[DataLoader, DataLoader]:
     """Returns 2d training and validation dataloaders with indices split at random
