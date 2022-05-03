@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from typing import Tuple
 
 import segmentation_models_pytorch as smp
 import torch
@@ -14,8 +15,9 @@ def create_unet_on_device(device_num: int, model_struc_dict: dict) -> smp.Unet:
 
 def create_unet_from_file(
     weights_fn: Path, gpu: bool = True, device_num: int = 0
-) -> smp.Unet:
-    """Creates and returns a U-Net model."""
+) -> Tuple[smp.Unet, int]:
+    """Creates and returns a U-Net model and the number of segmentation labels
+    that are predicted by the model."""
     if gpu:
         map_location = f"cuda:{device_num}"
     else:
@@ -26,4 +28,4 @@ def create_unet_from_file(
     unet_model = create_unet_on_device(device_num, model_dict["model_struc_dict"])
     logging.info("Loading in the saved weights.")
     unet_model.load_state_dict(model_dict["model_state_dict"])
-    return unet_model
+    return unet_model, model_dict["model_struc_dict"]["classes"]

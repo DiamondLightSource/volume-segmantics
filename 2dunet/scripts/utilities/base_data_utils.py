@@ -37,6 +37,20 @@ def get_batch_size(settings: SettingsData) -> int:
     return batch_size
 
 
+def prepare_training_batch(batch, device, num_labels):
+    inputs = batch[0].to(device)
+    targets = batch[1]
+    # One hot encode the channels
+    # TODO Replace with torch.nn.functional.one_hot
+    channels = []
+    for label_num in range(num_labels):
+        channel = torch.zeros_like(targets)
+        channel[targets == label_num] = 1
+        channels.append(channel)
+    targets = torch.stack(channels, 1).to(device, dtype=torch.uint8)
+    return inputs, targets
+
+
 def downsample_data(data, factor=2):
     logging.info(f"Downsampling data by a factor of {factor}.")
     return block_reduce(data, block_size=(factor, factor, factor), func=np.nanmean)
@@ -203,3 +217,11 @@ def axis_index_to_slice(vol, axis, index):
         return vol[:, index, :]
     if axis == "x":
         return vol[:, :, index]
+
+
+def save_data_to_hdf5(data, file_path, internal_path="/data", chunking=True):
+    logging.info(f"Saving data of shape {data.shape} to {file_path}.")
+    with h5.File(file_path, "w") as f:
+        f.create_dataset(
+            internal_path, data=data, chunks=chunking, compression=cfg.HDF5_COMPRESSION
+        )

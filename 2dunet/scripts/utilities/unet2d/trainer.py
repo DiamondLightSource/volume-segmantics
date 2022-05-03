@@ -16,10 +16,9 @@ from pytorch3dunet.unet3d.losses import BCEDiceLoss, DiceLoss, GeneralizedDiceLo
 from pytorch3dunet.unet3d.metrics import GenericAveragePrecision, MeanIoU
 from torch import nn as nn
 from tqdm import tqdm
+from utilities.base_data_utils import prepare_training_batch
 from utilities.early_stopping import EarlyStopping
 from utilities.unet2d.model import create_unet_on_device
-
-BAR_FORMAT = "{l_bar}{bar: 30}{r_bar}{bar: -30b}"  # tqdm progress bar
 
 
 class Unet2dTrainer:
@@ -127,19 +126,6 @@ class Unet2dTrainer:
             sys.exit(1)
         return eval_metric
 
-    def prepare_batch(self, batch, device):
-        inputs = batch[0].to(device)
-        targets = batch[1]
-        # One hot encode the channels
-        # TODO Replace with torch.nn.functional.one_hot
-        channels = []
-        for label_num in range(self.model_struc_dict["classes"]):
-            channel = torch.zeros_like(targets)
-            channel[targets == label_num] = 1
-            channels.append(channel)
-        targets = torch.stack(channels, 1).to(device, dtype=torch.uint8)
-        return inputs, targets
-
     def train_model(self, output_path, num_epochs, patience, create=True, frozen=False):
         """Performs training of model for a number of cycles
         with a learning rate that is determined automatically.
@@ -178,7 +164,9 @@ class Unet2dTrainer:
             tic = time.perf_counter()
             logging.info(f"Epoch {epoch} of {num_epochs}")
             for batch in tqdm(
-                self.training_loader, desc="Training batch", bar_format=BAR_FORMAT
+                self.training_loader,
+                desc="Training batch",
+                bar_format=cfg.TQDM_BAR_FORMAT,
             ):
                 loss = self.train_one_batch(lr_scheduler, batch)
                 train_losses.append(loss.item())  # record training loss
@@ -188,9 +176,11 @@ class Unet2dTrainer:
                 for batch in tqdm(
                     self.validation_loader,
                     desc="Validation batch",
-                    bar_format=BAR_FORMAT,
+                    bar_format=cfg.TQDM_BAR_FORMAT,
                 ):
-                    inputs, targets = self.prepare_batch(batch, self.model_device_num)
+                    inputs, targets = prepare_training_batch(
+                        batch, self.model_device_num, self.label_no
+                    )
                     output = self.model(inputs)  # Forward pass
                     # calculate the loss
                     if self.settings.loss_criterion == "CrossEntropyLoss":
@@ -267,7 +257,7 @@ class Unet2dTrainer:
         iters = 0
 
         self.model.train()
-        print(
+        logging.info(
             f"Training for {self.lr_find_epochs} epochs to create a learning "
             "rate plot."
         )
@@ -275,7 +265,7 @@ class Unet2dTrainer:
             for batch in tqdm(
                 self.training_loader,
                 desc=f"Epoch {i + 1}, batch number",
-                bar_format=BAR_FORMAT,
+                bar_format=cfg.TQDM_BAR_FORMAT,
             ):
                 loss = self.train_one_batch(lr_scheduler, batch)
                 lr_step = self.optimizer.state_dict()["param_groups"][0]["lr"]
@@ -366,7 +356,7 @@ class Unet2dTrainer:
         )
 
     def train_one_batch(self, lr_scheduler, batch):
-        inputs, targets = self.prepare_batch(batch, self.model_device_num)
+        inputs, targets = prepare_training_batch(batch, self.model_device_num, self.label_no)
         self.optimizer.zero_grad()
         output = self.model(inputs)  # Forward pass
         if self.settings.loss_criterion == "CrossEntropyLoss":
@@ -437,7 +427,7 @@ class Unet2dTrainer:
         self.model.eval()  # prep model for evaluation
         batch = next(iter(self.validation_loader))  # Get first batch
         with torch.no_grad():
-            inputs, targets = self.prepare_batch(batch, self.model_device_num)
+            inputs, targets = prepare_training_batch(batch, self.model_device_num, self.label_no)
             output = self.model(inputs)  # Forward pass
             s_max = nn.Softmax(dim=1)
             probs = s_max(output)  # Convert the logits to probs

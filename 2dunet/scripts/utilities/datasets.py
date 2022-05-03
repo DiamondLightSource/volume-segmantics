@@ -154,7 +154,7 @@ def get_2d_training_dataset(
     return Unet2dDataset(
         image_dir,
         label_dir,
-        preprocessing=augs.get_preprocess_augs(img_size),
+        preprocessing=augs.get_train_preprocess_augs(img_size),
         augmentation=augs.get_train_augs(img_size),
         postprocessing=augs.get_postprocess_augs(),
     )
@@ -168,14 +168,15 @@ def get_2d_validation_dataset(
     return Unet2dDataset(
         image_dir,
         label_dir,
-        preprocessing=augs.get_preprocess_augs(img_size),
+        preprocessing=augs.get_train_preprocess_augs(img_size),
         postprocessing=augs.get_postprocess_augs(),
     )
 
 
 def get_2d_prediction_dataset(data_vol: np.array) -> Unet2dPredictionDataset:
-
+    y_dim, x_dim = data_vol.shape[1:]
     return Unet2dPredictionDataset(
         data_vol,
+        preprocessing=augs.get_pred_preprocess_augs(y_dim, x_dim),
         postprocessing=augs.get_postprocess_augs(),
     )

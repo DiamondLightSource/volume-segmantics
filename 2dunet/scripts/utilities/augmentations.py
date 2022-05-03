@@ -1,13 +1,40 @@
+import math
+
+from matplotlib.pyplot import get
+
+import utilities
+
+import utilities.config as cfg
 import albumentations as A
 from albumentations.pytorch.transforms import ToTensorV2
 
 
-def get_preprocess_augs(img_size: int) -> A.core.composition.Compose:
+def get_train_preprocess_augs(img_size: int) -> A.core.composition.Compose:
 
     return A.Compose(
         [
             A.LongestMaxSize(max_size=img_size, p=1.0),
             A.PadIfNeeded(min_height=img_size, min_width=img_size, p=1.0),
+        ]
+    )
+
+
+def get_padded_dimension(dimension):
+    unet_divisor = cfg.UNET_DIVISOR
+    if dimension % unet_divisor == 0:
+        return dimension
+    return math.floor(dimension / unet_divisor) + 1
+
+
+def get_pred_preprocess_augs(
+    img_size_y: int, img_size_x: int
+) -> A.core.composition.Compose:
+
+    padded_y_dim = get_padded_dimension(img_size_y)
+    padded_x_dim = get_padded_dimension(img_size_x)
+    return A.Compose(
+        [
+            A.PadIfNeeded(min_height=padded_y_dim, min_width=padded_x_dim, p=1.0),
         ]
     )
 

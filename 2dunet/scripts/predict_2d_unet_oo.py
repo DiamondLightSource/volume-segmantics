@@ -3,15 +3,14 @@
 import argparse
 import logging
 import warnings
+from datetime import date
 from pathlib import Path
 
 from utilities import config as cfg
 from utilities.cmdline import CheckExt
 from utilities.settingsdata import SettingsData
-# from utilities.data import (PredictionDataSlicer, PredictionHDF5DataSlicer,
-#                             SettingsData)
-from utilities.unet2d.predictor import Unet2dPredictor
 from utilities.unet2d.prediction_manager import Unet2DPredictionManager
+from utilities.unet2d.predictor import Unet2dPredictor
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -42,6 +41,10 @@ def init_argparse() -> argparse.ArgumentParser:
                         help='path to a directory containing the "unet-settings", data will be also be output to this location')
     return parser
 
+def create_output_path(root_path, data_vol_path):
+    pred_out_fn = f"{date.today()}_{data_vol_path.stem}_2dUnet_vol_pred.h5"
+    return Path(root_path, pred_out_fn)
+
 if __name__ == "__main__":
     logging.basicConfig(
         level=logging.INFO, format=cfg.LOGGING_FMT,
@@ -54,6 +57,7 @@ if __name__ == "__main__":
     settings = SettingsData(settings_path)
     model_file_path = getattr(args, cfg.MODEL_PTH_ARG)
     predictor = Unet2dPredictor(model_file_path, settings)
-    data_vol_path = getattr(args, cfg.PREDICT_DATA_ARG)
+    data_vol_path = Path(getattr(args, cfg.PREDICT_DATA_ARG))
+    output_path = create_output_path(root_path, data_vol_path)
     pred_manager = Unet2DPredictionManager(predictor, data_vol_path, settings)
-    pred_manager.predict_volume()
+    pred_manager.predict_volume_to_path(output_path)
