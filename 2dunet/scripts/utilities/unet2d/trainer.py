@@ -10,13 +10,13 @@ import termplotlib as tpl
 
 mpl.use("Agg")
 import torch
+import torch.nn as nn
+import utilities.base_data_utils as utils
 import utilities.config as cfg
 from matplotlib import pyplot as plt
 from pytorch3dunet.unet3d.losses import BCEDiceLoss, DiceLoss, GeneralizedDiceLoss
 from pytorch3dunet.unet3d.metrics import GenericAveragePrecision, MeanIoU
-from torch import nn as nn
 from tqdm import tqdm
-from utilities.base_data_utils import prepare_training_batch
 from utilities.early_stopping import EarlyStopping
 from utilities.unet2d.model import create_unet_on_device
 
@@ -178,7 +178,7 @@ class Unet2dTrainer:
                     desc="Validation batch",
                     bar_format=cfg.TQDM_BAR_FORMAT,
                 ):
-                    inputs, targets = prepare_training_batch(
+                    inputs, targets = utils.prepare_training_batch(
                         batch, self.model_device_num, self.label_no
                     )
                     output = self.model(inputs)  # Forward pass
@@ -356,7 +356,9 @@ class Unet2dTrainer:
         )
 
     def train_one_batch(self, lr_scheduler, batch):
-        inputs, targets = prepare_training_batch(batch, self.model_device_num, self.label_no)
+        inputs, targets = utils.prepare_training_batch(
+            batch, self.model_device_num, self.label_no
+        )
         self.optimizer.zero_grad()
         output = self.model(inputs)  # Forward pass
         if self.settings.loss_criterion == "CrossEntropyLoss":
@@ -427,7 +429,9 @@ class Unet2dTrainer:
         self.model.eval()  # prep model for evaluation
         batch = next(iter(self.validation_loader))  # Get first batch
         with torch.no_grad():
-            inputs, targets = prepare_training_batch(batch, self.model_device_num, self.label_no)
+            inputs, targets = utils.prepare_training_batch(
+                batch, self.model_device_num, self.label_no
+            )
             output = self.model(inputs)  # Forward pass
             s_max = nn.Softmax(dim=1)
             probs = s_max(output)  # Convert the logits to probs

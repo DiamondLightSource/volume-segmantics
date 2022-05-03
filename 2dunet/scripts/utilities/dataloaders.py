@@ -5,12 +5,12 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, Subset
 
-from utilities import base_data_utils as utils
-from utilities import config as cfg
+import utilities.base_data_utils as utils
+import utilities.config as cfg
 from utilities.datasets import (
+    get_2d_prediction_dataset,
     get_2d_training_dataset,
     get_2d_validation_dataset,
-    get_2d_prediction_dataset,
 )
 from utilities.settingsdata import SettingsData
 
@@ -63,7 +63,7 @@ def get_2d_prediction_dataloader(
     data_vol: np.array, settings: SettingsData
 ) -> DataLoader:
     pred_dataset = get_2d_prediction_dataset(data_vol)
-    batch_size = utils.get_batch_size(settings)
+    batch_size = utils.get_batch_size(settings, prediction=True)
     return DataLoader(
         pred_dataset,
         batch_size=batch_size,

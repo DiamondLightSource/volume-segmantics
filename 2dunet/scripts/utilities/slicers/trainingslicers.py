@@ -4,15 +4,10 @@ import os
 from pathlib import Path
 
 import numpy as np
+import utilities.base_data_utils as utils
 from skimage import img_as_ubyte, io
 from tqdm import tqdm
 from utilities.base_data_manager import BaseDataManager
-from utilities.base_data_utils import (
-    axis_index_to_slice,
-    get_axis_index_pairs,
-    get_num_of_ims,
-    get_numpy_from_path,
-)
 
 
 class TrainingDataSlicer(BaseDataManager):
@@ -31,7 +26,7 @@ class TrainingDataSlicer(BaseDataManager):
         self.multilabel = False
         self.settings = settings
         self.label_vol_path = Path(label_vol_path)
-        self.seg_vol = get_numpy_from_path(
+        self.seg_vol = utils.get_numpy_from_path(
             self.label_vol_path, internal_path=settings.seg_hdf5_path
         )
         self.preprocess_labels()
@@ -92,11 +87,11 @@ class TrainingDataSlicer(BaseDataManager):
             label (bool): Whether this is a label volume.
         """
         shape_tup = data_arr.shape
-        ax_idx_pairs = get_axis_index_pairs(shape_tup)
-        num_ims = get_num_of_ims(shape_tup)
+        ax_idx_pairs = utils.get_axis_index_pairs(shape_tup)
+        num_ims = utils.get_num_of_ims(shape_tup)
         for axis, index in tqdm(ax_idx_pairs, total=num_ims):
             out_path = output_path / f"{name_prefix}_{axis}_stack_{index}"
-            self.output_im(axis_index_to_slice(data_arr, axis, index), out_path, label)
+            self.output_im(utils.axis_index_to_slice(data_arr, axis, index), out_path, label)
 
     def output_im(self, data, path, label=False):
         """Converts a slice of data into an image on disk.

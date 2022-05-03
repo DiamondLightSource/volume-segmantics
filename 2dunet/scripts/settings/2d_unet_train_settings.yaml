@@ -8,7 +8,7 @@ data_hdf5_path: /data # The internal HDF5 path to the image data
 seg_hdf5_path: /data # The internal HDF5 path to the label data
 
 # Settings for Unet training
-image_size: 256 # size of images in databunch used for training
+image_size: 256 # size of images in databunch used for training (must be multiple of 32)
 downsample: False # If True, data will be downsampled by 2
 training_set_proportion: 0.8 # Proportion of images to use the training, rest are used for validation
 cuda_device: 0 # The graphics card to use (between 0 and 3 for a machine with 4 GPUs)

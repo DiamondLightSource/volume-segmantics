@@ -22,11 +22,17 @@ SETTINGS_DIR = "unet-settings"
 TRAIN_SETTINGS_FN = "2d_unet_train_settings.yaml"
 PREDICTION_SETTINGS_FN = "2d_unet_predict_settings.yaml"
 
-BIG_CUDA_SIZE = 8 # GPU Memory (GB), above this value batch size is increased
-BIG_CUDA_BATCH = 16 # Size of batch on big GPU
+TQDM_BAR_FORMAT = "{l_bar}{bar: 30}{r_bar}{bar: -30b}"  # tqdm progress bar format
+
+HDF5_COMPRESSION = "gzip"
+
+BIG_CUDA_THRESHOLD = 8 # GPU Memory (GB), above this value batch size is increased
+BIG_CUDA_TRAIN_BATCH = 16 # Size of training batch on big GPU
+BIG_CUDA_PRED_BATCH = 12 # Size of prediction batch on big GPU
 SMALL_CUDA_BATCH = 4 # Size of batch on small GPU
 NUM_WORKERS = 8 # Number of parallel workers for training/validation dataloaders
-PIN_CUDA_MEMORY = True # Whether to pin CUDA memory for faster data transfer 
+PIN_CUDA_MEMORY = True # Whether to pin CUDA memory for faster data transfer
+UNET_DIVISOR = 32 # Image dimensions need to be a multiple of this value 
 
 DEFAULT_MIN_LR = 0.00075 # Learning rate to return if LR finder fails
 

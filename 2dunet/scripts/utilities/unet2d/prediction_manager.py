@@ -1,12 +1,9 @@
-import logging
 from pathlib import Path
-from datetime import date
 
-import utilities.config as cfg
+import utilities.base_data_utils as utils
+from utilities.base_data_manager import BaseDataManager
 from utilities.settingsdata import SettingsData
 from utilities.unet2d.predictor import Unet2dPredictor
-from utilities.base_data_manager import BaseDataManager
-from utilities.base_data_utils import save_data_to_hdf5
 
 
 class Unet2DPredictionManager(BaseDataManager):
@@ -22,4 +19,4 @@ class Unet2DPredictionManager(BaseDataManager):
         quality = self.settings.quality
         if quality == "low":
             prediction = self.predictor.predict_single_axis(self.data_vol)
-        save_data_to_hdf5(prediction, output_path)
+        utils.save_data_to_hdf5(prediction, output_path)
