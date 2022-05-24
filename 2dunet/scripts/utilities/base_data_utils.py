@@ -19,6 +19,10 @@ class Quality(Enum):
     HIGH = 12
 
 
+def get_prediction_quality(settings: SettingsData) -> Enum:
+    return Quality[settings.quality.upper()]
+
+
 def get_batch_size(settings: SettingsData, prediction: bool = False) -> int:
 
     cuda_device_num = settings.cuda_device
@@ -32,7 +36,7 @@ def get_batch_size(settings: SettingsData, prediction: bool = False) -> int:
         batch_size = cfg.BIG_CUDA_TRAIN_BATCH
     else:
         batch_size = cfg.BIG_CUDA_PRED_BATCH
-    
+
     logging.info(
         f"Free GPU memory is {free_gpu_mem:0.2f} GB. Batch size will be "
         f"{batch_size}."

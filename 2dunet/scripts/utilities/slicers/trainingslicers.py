@@ -91,7 +91,9 @@ class TrainingDataSlicer(BaseDataManager):
         num_ims = utils.get_num_of_ims(shape_tup)
         for axis, index in tqdm(ax_idx_pairs, total=num_ims):
             out_path = output_path / f"{name_prefix}_{axis}_stack_{index}"
-            self.output_im(utils.axis_index_to_slice(data_arr, axis, index), out_path, label)
+            self.output_im(
+                utils.axis_index_to_slice(data_arr, axis, index), out_path, label
+            )
 
     def output_im(self, data, path, label=False):
         """Converts a slice of data into an image on disk.
@@ -108,29 +110,16 @@ class TrainingDataSlicer(BaseDataManager):
                 data[data > 1] = 1
         io.imsave(f"{path}.png", data)
 
-    def delete_data_im_slices(self):
-        """Deletes image slices in the data image output directory. Leaves the
-        directory in place since it contains model training history.
-        """
-        if self.data_im_out_dir:
-            data_ims = glob.glob(f"{str(self.data_im_out_dir) + '/*.png'}")
-            logging.info(f"Deleting {len(data_ims)} image slices")
-            for fn in data_ims:
-                os.remove(fn)
-
-    def delete_label_im_slices(self):
-        """Deletes label image slices in the segmented image output directory.
-        Also deletes the directory itself.
-        """
-        if self.seg_im_out_dir:
-            seg_ims = glob.glob(f"{str(self.seg_im_out_dir) + '/*.png'}")
-            logging.info(f"Deleting {len(seg_ims)} segmentation slices")
-            for fn in seg_ims:
-                os.remove(fn)
-            logging.info(f"Deleting the empty segmentation image directory")
-            os.rmdir(self.seg_im_out_dir)
+    def delete_image_dir(self, im_dir_path):
+        if im_dir_path.exists():
+            ims = list(im_dir_path.glob("*.png"))
+            logging.info(f"Deleting {len(ims)} images.")
+            for im in ims:
+                im.unlink()
+            logging.info(f"Deleting the empty directory.")
+            im_dir_path.rmdir()
 
     def clean_up_slices(self):
         """Wrapper function that cleans up data and label image slices."""
-        self.delete_data_im_slices()
-        self.delete_label_im_slices()
+        self.delete_image_dir(self.data_im_out_dir)
+        self.delete_image_dir(self.seg_im_out_dir)

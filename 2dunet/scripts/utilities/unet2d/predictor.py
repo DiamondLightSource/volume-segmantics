@@ -47,3 +47,25 @@ class Unet2dPredictor:
                 labels = labels.astype(np.uint8)
                 output_vol_list.append(labels)
         return np.concatenate(output_vol_list)
+
+    def predict_triple_axis(self, data_vol):
+        output_vol_list = []
+        yx_dims = list(data_vol.shape[1:])
+        s_max = nn.Softmax(dim=1)
+        data_loader = get_2d_prediction_dataloader(data_vol, self.settings)
+        self.model.eval()
+        logging.info(f"Predicting segmentation for volume of shape {data_vol.shape}.")
+        with torch.no_grad():
+            for batch in tqdm(
+                data_loader, desc="Prediction batch", bar_format=cfg.TQDM_BAR_FORMAT
+            ):
+                output = self.model(batch.to(self.model_device_num))  # Forward pass
+                probs = s_max(output)  # Convert the logits to probs
+                labels = torch.argmax(probs, dim=1)  # flatten channels
+                if labels.is_cuda:
+                    labels = labels.cpu()
+                labels = F.center_crop(labels, yx_dims)
+                labels = labels.detach().numpy()
+                labels = labels.astype(np.uint8)
+                output_vol_list.append(labels)
+        return np.concatenate(output_vol_list)
