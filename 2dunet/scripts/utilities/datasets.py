@@ -1,15 +1,13 @@
 import re
 from pathlib import Path
 
-import albumentations as A
 import cv2
 import numpy as np
 from torch.utils.data import Dataset as BaseDataset
 
-import utilities.base_data_utils as utils
-import utilities.config as cfg
 from utilities import augmentations as augs
 from utilities.settingsdata import SettingsData
+import utilities.config as cfg
 
 
 class Unet2dDataset(BaseDataset):
@@ -111,43 +109,22 @@ class Unet2dPredictionDataset(BaseDataset):
     def __init__(
         self,
         data_vol,
-        prediction_quality,
         preprocessing=None,
-        padding=True,
         imagenet_norm=True,
         postprocessing=None,
     ):
         self.data_vol = data_vol
-        self.prediction_quality = prediction_quality
         self.preprocessing = preprocessing
-        self.padding = padding
         self.imagenet_norm = imagenet_norm
         self.postprocessing = postprocessing
-        self.axis_index_pairs = list(utils.get_axis_index_pairs(self.data_vol.shape))
-        self.length = self.calculate_length()
 
     def __getitem__(self, i):
 
-        axis, idx = self.axis_index_pairs[i]
-        image = utils.axis_index_to_slice(self.data_vol, axis, idx)
+        image = self.data_vol[i]
 
         # apply pre-processing
         if self.preprocessing:
             sample = self.preprocessing(image=image)
-            image = sample["image"]
-
-        if self.padding:
-            im_dim_y, im_dim_x = image.shape
-            padded_dim_y = augs.get_padded_dimension(im_dim_y)
-            padded_dim_x = augs.get_padded_dimension(im_dim_x)
-            pad_func = A.Compose(
-                [
-                    A.PadIfNeeded(
-                        min_height=padded_dim_y, min_width=padded_dim_x, p=1.0
-                    ),
-                ]
-            )
-            sample = pad_func(image=image)
             image = sample["image"]
 
         if self.imagenet_norm:
@@ -166,15 +143,7 @@ class Unet2dPredictionDataset(BaseDataset):
         return image
 
     def __len__(self):
-        return self.length
-
-    def calculate_length(self):
-        if self.prediction_quality == utils.Quality.LOW:
-            return self.data_vol.shape[0]  # num of z slices
-        elif self.prediction_quality == utils.Quality.MEDIUM:
-            return utils.get_num_of_ims(self.data_vol.shape)  # Sum of z, y, x slices
-        elif self.prediction_quality == utils.Quality.HIGH:
-            return utils.get_num_of_ims(self.data_vol.shape) * 4
+        return self.data_vol.shape[0]
 
 
 def get_2d_training_dataset(
@@ -204,11 +173,10 @@ def get_2d_validation_dataset(
     )
 
 
-def get_2d_prediction_dataset(
-    data_vol: np.array, prediction_quality: utils.Quality
-) -> Unet2dPredictionDataset:
+def get_2d_prediction_dataset(data_vol: np.array) -> Unet2dPredictionDataset:
+    y_dim, x_dim = data_vol.shape[1:]
     return Unet2dPredictionDataset(
         data_vol,
-        prediction_quality,
+        preprocessing=augs.get_pred_preprocess_augs(y_dim, x_dim),
         postprocessing=augs.get_postprocess_augs(),
     )

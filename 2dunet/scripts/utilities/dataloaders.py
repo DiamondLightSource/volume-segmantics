@@ -62,9 +62,8 @@ def get_2d_training_dataloaders(
 def get_2d_prediction_dataloader(
     data_vol: np.array, settings: SettingsData
 ) -> DataLoader:
-    prediction_quality = utils.get_prediction_quality(settings)
+    pred_dataset = get_2d_prediction_dataset(data_vol)
     batch_size = utils.get_batch_size(settings, prediction=True)
-    pred_dataset = get_2d_prediction_dataset(data_vol, prediction_quality)
     return DataLoader(
         pred_dataset,
         batch_size=batch_size,
