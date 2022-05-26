@@ -1,9 +1,13 @@
 import logging
 from pathlib import Path
+from typing import List
+from matplotlib.pyplot import axis
 
 import numpy as np
 import torch
 import torchvision.transforms.functional as F
+import utilities.base_data_utils as utils
+from utilities.base_data_utils import Axis
 import utilities.config as cfg
 from torch import nn as nn
 from tqdm import tqdm
@@ -26,30 +30,17 @@ class Unet2dPredictor:
     def get_model_from_trainer(self, trainer):
         self.model = trainer.model
 
-    def predict_single_axis(self, data_vol):
-        output_vol_list = []
-        yx_dims = list(data_vol.shape[1:])
-        s_max = nn.Softmax(dim=1)
-        data_loader = get_2d_prediction_dataloader(data_vol, self.settings)
-        self.model.eval()
-        logging.info(f"Predicting segmentation for volume of shape {data_vol.shape}.")
-        with torch.no_grad():
-            for batch in tqdm(
-                data_loader, desc="Prediction batch", bar_format=cfg.TQDM_BAR_FORMAT
-            ):
-                output = self.model(batch.to(self.model_device_num))  # Forward pass
-                probs = s_max(output)  # Convert the logits to probs
-                labels = torch.argmax(probs, dim=1)  # flatten channels
-                if labels.is_cuda:
-                    labels = labels.cpu()
-                labels = F.center_crop(labels, yx_dims)
-                labels = labels.detach().numpy()
-                labels = labels.astype(np.uint8)
-                output_vol_list.append(labels)
-        return np.concatenate(output_vol_list)
+    def crop_tensor_to_array(
+        self, tensor: torch.Tensor, yx_dims: List[int]
+    ) -> np.array:
+        if tensor.is_cuda:
+            tensor = tensor.cpu()
+        tensor = F.center_crop(tensor, yx_dims)
+        return tensor.detach().numpy()
 
-    def predict_triple_axis(self, data_vol):
+    def predict_single_axis(self, data_vol, output_probs=False, axis=None):
         output_vol_list = []
+        output_prob_list = []
         yx_dims = list(data_vol.shape[1:])
         s_max = nn.Softmax(dim=1)
         data_loader = get_2d_prediction_dataloader(data_vol, self.settings)
@@ -61,11 +52,69 @@ class Unet2dPredictor:
             ):
                 output = self.model(batch.to(self.model_device_num))  # Forward pass
                 probs = s_max(output)  # Convert the logits to probs
+                # TODO: Don't flatten channels if one-hot output is needed
                 labels = torch.argmax(probs, dim=1)  # flatten channels
-                if labels.is_cuda:
-                    labels = labels.cpu()
-                labels = F.center_crop(labels, yx_dims)
-                labels = labels.detach().numpy()
-                labels = labels.astype(np.uint8)
-                output_vol_list.append(labels)
-        return np.concatenate(output_vol_list)
+                labels = self.crop_tensor_to_array(labels, yx_dims)
+                output_vol_list.append(labels.astype(np.uint8))
+                if output_probs:
+                    # Get indices of max probs
+                    max_prob_idx = torch.argmax(probs, dim=1, keepdim=True)
+                    # Extract along axis from outputs
+                    probs = torch.gather(probs, 1, max_prob_idx)
+                    # Remove the label dimension
+                    probs = torch.squeeze(probs, dim=1)
+                    probs = self.crop_tensor_to_array(probs, yx_dims)
+                    output_prob_list.append(probs.astype(np.float16))
+
+        labels = np.concatenate(output_vol_list)
+        probs = np.concatenate(output_prob_list) if output_prob_list else None
+        if axis == Axis.Y:
+            labels = labels.swapaxes(0, 1)
+            if probs is not None:
+                probs = probs.swapaxes(0, 1)
+        elif axis == Axis.X:
+            labels = labels.swapaxes(0, 2)
+            if probs is not None:
+                probs = probs.swapaxes(0, 2)
+        return labels, probs
+
+    def predict_single_axis_to_one_hot(self, data_vol, axis=None):
+        prediction, _ = self.predict_single_axis(data_vol, axis=axis)
+        return utils.one_hot_encode_array(prediction, self.num_labels)
+
+    def predict_3ways_to_one_hot(self, data_vol):
+        one_hot_out = self.predict_single_axis_to_one_hot(data_vol)
+        one_hot_out += self.predict_single_axis_to_one_hot(data_vol.swapaxes(0, 1), axis=Axis.Y)
+        one_hot_out += self.predict_single_axis_to_one_hot(data_vol.swapaxes(0, 2), axis=Axis.X)
+        return one_hot_out
+
+    def predict_3ways_max_probs(self, data_vol):
+        shape_tup = data_vol.shape
+        logging.info("Creating empty data volumes in RAM")
+        label_container = np.empty((2, *shape_tup), dtype=np.uint8)
+        prob_container = np.empty((2, *shape_tup), dtype=np.float16)
+        logging.info("Predicting YX slices:")
+        label_container[0], prob_container[0] = self.predict_single_axis(
+            data_vol, output_probs=True
+        )
+        logging.info("Predicting ZX slices:")
+        label_container[1], prob_container[1] = self.predict_single_axis(
+            data_vol.swapaxes(0, 1), output_probs=True, axis=Axis.Y
+        )
+        logging.info("Merging XY and ZX volumes.")
+        self.merge_vols_in_mem(prob_container, label_container)
+        logging.info("Predicting ZY slices:")
+        label_container[1], prob_container[1] = self.predict_single_axis(
+            data_vol.swapaxes(0, 2), output_probs=True, axis=Axis.X
+        )
+        logging.info("Merging max of XY and ZX volumes with ZY volume.")
+        self.merge_vols_in_mem(prob_container, label_container)
+        return label_container[0]
+
+    def merge_vols_in_mem(self, prob_container, label_container):
+        max_prob_idx = np.argmax(prob_container, axis=0)
+        max_prob_idx = max_prob_idx[np.newaxis, :, :, :]
+        prob_container[0] = np.squeeze(np.take_along_axis(
+            prob_container, max_prob_idx, axis=0))
+        label_container[0] = np.squeeze(np.take_along_axis(
+            label_container, max_prob_idx, axis=0))

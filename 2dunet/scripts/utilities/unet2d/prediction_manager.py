@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import numpy as np
 import utilities.base_data_utils as utils
 from utilities.base_data_manager import BaseDataManager
 from utilities.settingsdata import SettingsData
@@ -15,10 +16,16 @@ class Unet2DPredictionManager(BaseDataManager):
         self.predictor = predictor
         self.settings = settings
 
-    def predict_volume_to_path(self, output_path: Path) -> None:
+    def predict_volume_to_path(self, output_path: Path, one_hot: bool = False) -> None:
         quality = utils.get_prediction_quality(self.settings)
         if quality == utils.Quality.LOW:
-            prediction = self.predictor.predict_single_axis(self.data_vol)
+            if one_hot:
+                prediction = self.predictor.predict_single_axis_to_one_hot(self.data_vol)
+            else:
+                prediction, _ = self.predictor.predict_single_axis(self.data_vol)
         if quality == utils.Quality.MEDIUM:
-            prediction = self.predictor.predict_triple_axis(self.data_vol)
+            if one_hot:
+                prediction = self.predictor.predict_3ways_to_one_hot(self.data_vol)
+            else:
+                prediction = self.predictor.predict_3ways_max_probs(self.data_vol)
         utils.save_data_to_hdf5(prediction, output_path)

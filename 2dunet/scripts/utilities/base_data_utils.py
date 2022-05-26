@@ -19,6 +19,12 @@ class Quality(Enum):
     HIGH = 12
 
 
+class Axis(Enum):
+    Z = 0
+    Y = 1
+    X = 2
+
+
 def get_prediction_quality(settings: SettingsData) -> Enum:
     return Quality[settings.quality.upper()]
 
@@ -42,6 +48,15 @@ def get_batch_size(settings: SettingsData, prediction: bool = False) -> int:
         f"{batch_size}."
     )
     return batch_size
+
+
+def one_hot_encode_array(input_array, num_labels):
+    """Modified from https://stackoverflow.com/questions/36960320/convert-a-2d-matrix-to-a-3d-one-hot-matrix-numpy"""
+    ncols = num_labels
+    out = np.zeros((ncols, input_array.size), dtype=np.uint8)
+    out[input_array.ravel(), np.arange(input_array.size)] = 1
+    out.shape = (ncols,) + input_array.shape
+    return out
 
 
 def prepare_training_batch(batch: "list[torch.tensor]", device: int, num_labels):
