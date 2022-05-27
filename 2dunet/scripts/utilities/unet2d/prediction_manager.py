@@ -29,11 +29,16 @@ class Unet2DPredictionManager(BaseDataManager):
                 prediction, probs = self.predictor.predict_single_axis(self.data_vol)
         if quality == utils.Quality.MEDIUM:
             if one_hot:
-                prediction = self.predictor.predict_3ways_to_one_hot(self.data_vol)
+                prediction = self.predictor.predict_3_ways_one_hot(self.data_vol)
             else:
-                prediction, probs = self.predictor.predict_3ways_max_probs(
+                prediction, probs = self.predictor.predict_3_ways_max_probs(
                     self.data_vol
                 )
+        if quality == utils.Quality.HIGH:
+            if one_hot:
+                prediction = self.predictor.predict_12_ways_one_hot(self.data_vol)
+            else:
+                pass
         utils.save_data_to_hdf5(prediction, output_path)
         if probs is not None and self.settings.output_probs:
             utils.save_data_to_hdf5(

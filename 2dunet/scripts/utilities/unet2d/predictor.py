@@ -67,13 +67,23 @@ class Unet2dPredictor:
         prediction, _ = self.predict_single_axis(data_vol, axis=axis)
         return utils.one_hot_encode_array(prediction, self.num_labels)
 
-    def predict_3ways_to_one_hot(self, data_vol):
+    def predict_3_ways_one_hot(self, data_vol):
         one_hot_out = self.predict_single_axis_to_one_hot(data_vol)
         one_hot_out += self.predict_single_axis_to_one_hot(data_vol, Axis.Y)
         one_hot_out += self.predict_single_axis_to_one_hot(data_vol, Axis.X)
         return one_hot_out
 
-    def predict_3ways_max_probs(self, data_vol):
+    def predict_12_ways_one_hot(self, data_vol):
+        one_hot_out = self.predict_3_ways_one_hot(data_vol)
+        for k in range(1, 4):
+            logging.info(f"Rotating volume {k * 90} degrees")
+            data_vol = np.rot90(data_vol)
+            one_hot_out += np.rot90(
+                self.predict_3_ways_one_hot(data_vol), -k, axes=(-3, -2)
+            )
+        return one_hot_out
+
+    def predict_3_ways_max_probs(self, data_vol):
         shape_tup = data_vol.shape
         logging.info("Creating empty data volumes in RAM")
         label_container = np.empty((2, *shape_tup), dtype=np.uint8)
