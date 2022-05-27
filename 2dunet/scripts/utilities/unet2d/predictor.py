@@ -1,11 +1,8 @@
 import logging
 from pathlib import Path
-from typing import List
-from matplotlib.pyplot import axis
 
 import numpy as np
 import torch
-import torchvision.transforms.functional as F
 import utilities.base_data_utils as utils
 from utilities.base_data_utils import Axis
 import utilities.config as cfg
@@ -30,17 +27,10 @@ class Unet2dPredictor:
     def get_model_from_trainer(self, trainer):
         self.model = trainer.model
 
-    def crop_tensor_to_array(
-        self, tensor: torch.Tensor, yx_dims: List[int]
-    ) -> np.array:
-        if tensor.is_cuda:
-            tensor = tensor.cpu()
-        tensor = F.center_crop(tensor, yx_dims)
-        return tensor.detach().numpy()
-
-    def predict_single_axis(self, data_vol, output_probs=False, axis=None):
+    def predict_single_axis(self, data_vol, output_probs=False, axis=Axis.Z):
         output_vol_list = []
         output_prob_list = []
+        data_vol = utils.rotate_array_to_axis(data_vol, axis)
         yx_dims = list(data_vol.shape[1:])
         s_max = nn.Softmax(dim=1)
         data_loader = get_2d_prediction_dataloader(data_vol, self.settings)
@@ -54,7 +44,7 @@ class Unet2dPredictor:
                 probs = s_max(output)  # Convert the logits to probs
                 # TODO: Don't flatten channels if one-hot output is needed
                 labels = torch.argmax(probs, dim=1)  # flatten channels
-                labels = self.crop_tensor_to_array(labels, yx_dims)
+                labels = utils.crop_tensor_to_array(labels, yx_dims)
                 output_vol_list.append(labels.astype(np.uint8))
                 if output_probs:
                     # Get indices of max probs
@@ -63,29 +53,24 @@ class Unet2dPredictor:
                     probs = torch.gather(probs, 1, max_prob_idx)
                     # Remove the label dimension
                     probs = torch.squeeze(probs, dim=1)
-                    probs = self.crop_tensor_to_array(probs, yx_dims)
+                    probs = utils.crop_tensor_to_array(probs, yx_dims)
                     output_prob_list.append(probs.astype(np.float16))
 
         labels = np.concatenate(output_vol_list)
+        labels = utils.rotate_array_to_axis(labels, axis)
         probs = np.concatenate(output_prob_list) if output_prob_list else None
-        if axis == Axis.Y:
-            labels = labels.swapaxes(0, 1)
-            if probs is not None:
-                probs = probs.swapaxes(0, 1)
-        elif axis == Axis.X:
-            labels = labels.swapaxes(0, 2)
-            if probs is not None:
-                probs = probs.swapaxes(0, 2)
+        if probs is not None:
+            probs = utils.rotate_array_to_axis(probs, axis)
         return labels, probs
 
-    def predict_single_axis_to_one_hot(self, data_vol, axis=None):
+    def predict_single_axis_to_one_hot(self, data_vol, axis):
         prediction, _ = self.predict_single_axis(data_vol, axis=axis)
         return utils.one_hot_encode_array(prediction, self.num_labels)
 
     def predict_3ways_to_one_hot(self, data_vol):
         one_hot_out = self.predict_single_axis_to_one_hot(data_vol)
-        one_hot_out += self.predict_single_axis_to_one_hot(data_vol.swapaxes(0, 1), axis=Axis.Y)
-        one_hot_out += self.predict_single_axis_to_one_hot(data_vol.swapaxes(0, 2), axis=Axis.X)
+        one_hot_out += self.predict_single_axis_to_one_hot(data_vol, Axis.Y)
+        one_hot_out += self.predict_single_axis_to_one_hot(data_vol, Axis.X)
         return one_hot_out
 
     def predict_3ways_max_probs(self, data_vol):
@@ -99,13 +84,13 @@ class Unet2dPredictor:
         )
         logging.info("Predicting ZX slices:")
         label_container[1], prob_container[1] = self.predict_single_axis(
-            data_vol.swapaxes(0, 1), output_probs=True, axis=Axis.Y
+            data_vol, output_probs=True, axis=Axis.Y
         )
         logging.info("Merging XY and ZX volumes.")
         self.merge_vols_in_mem(prob_container, label_container)
         logging.info("Predicting ZY slices:")
         label_container[1], prob_container[1] = self.predict_single_axis(
-            data_vol.swapaxes(0, 2), output_probs=True, axis=Axis.X
+            data_vol, output_probs=True, axis=Axis.X
         )
         logging.info("Merging max of XY and ZX volumes with ZY volume.")
         self.merge_vols_in_mem(prob_container, label_container)
@@ -114,7 +99,9 @@ class Unet2dPredictor:
     def merge_vols_in_mem(self, prob_container, label_container):
         max_prob_idx = np.argmax(prob_container, axis=0)
         max_prob_idx = max_prob_idx[np.newaxis, :, :, :]
-        prob_container[0] = np.squeeze(np.take_along_axis(
-            prob_container, max_prob_idx, axis=0))
-        label_container[0] = np.squeeze(np.take_along_axis(
-            label_container, max_prob_idx, axis=0))
+        prob_container[0] = np.squeeze(
+            np.take_along_axis(prob_container, max_prob_idx, axis=0)
+        )
+        label_container[0] = np.squeeze(
+            np.take_along_axis(label_container, max_prob_idx, axis=0)
+        )

@@ -2,11 +2,13 @@ import logging
 import sys
 from enum import Enum
 from itertools import chain, product
+from typing import List
 
 import h5py as h5
 import imageio
 import numpy as np
 import torch
+import torchvision.transforms.functional as F
 from skimage.measure import block_reduce
 
 from utilities import config as cfg
@@ -48,6 +50,22 @@ def get_batch_size(settings: SettingsData, prediction: bool = False) -> int:
         f"{batch_size}."
     )
     return batch_size
+
+
+def crop_tensor_to_array(tensor: torch.Tensor, yx_dims: List[int]) -> np.array:
+    if tensor.is_cuda:
+        tensor = tensor.cpu()
+    tensor = F.center_crop(tensor, yx_dims)
+    return tensor.detach().numpy()
+
+
+def rotate_array_to_axis(array: np.array, axis: Axis = Axis.Z) -> np.array:
+    if axis == Axis.Z:
+        return array
+    if axis == Axis.Y:
+        return array.swapaxes(0, 1)
+    if axis == Axis.X:
+        return array.swapaxes(0, 2)
 
 
 def one_hot_encode_array(input_array, num_labels):
