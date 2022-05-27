@@ -38,7 +38,9 @@ class Unet2DPredictionManager(BaseDataManager):
             if one_hot:
                 prediction = self.predictor.predict_12_ways_one_hot(self.data_vol)
             else:
-                pass
+                prediction, probs = self.predictor.predict_12_ways_max_probs(
+                    self.data_vol
+                )
         utils.save_data_to_hdf5(prediction, output_path)
         if probs is not None and self.settings.output_probs:
             utils.save_data_to_hdf5(
