@@ -16,16 +16,26 @@ class Unet2DPredictionManager(BaseDataManager):
         self.predictor = predictor
         self.settings = settings
 
-    def predict_volume_to_path(self, output_path: Path, one_hot: bool = False) -> None:
+    def predict_volume_to_path(self, output_path: Path) -> None:
+        probs = None
+        one_hot = self.settings.one_hot
         quality = utils.get_prediction_quality(self.settings)
         if quality == utils.Quality.LOW:
             if one_hot:
-                prediction = self.predictor.predict_single_axis_to_one_hot(self.data_vol)
+                prediction = self.predictor.predict_single_axis_to_one_hot(
+                    self.data_vol
+                )
             else:
-                prediction, _ = self.predictor.predict_single_axis(self.data_vol)
+                prediction, probs = self.predictor.predict_single_axis(self.data_vol)
         if quality == utils.Quality.MEDIUM:
             if one_hot:
                 prediction = self.predictor.predict_3ways_to_one_hot(self.data_vol)
             else:
-                prediction = self.predictor.predict_3ways_max_probs(self.data_vol)
+                prediction, probs = self.predictor.predict_3ways_max_probs(
+                    self.data_vol
+                )
         utils.save_data_to_hdf5(prediction, output_path)
+        if probs is not None and self.settings.output_probs:
+            utils.save_data_to_hdf5(
+                probs, f"{output_path.parent / output_path.stem}_probs.h5"
+            )

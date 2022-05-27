@@ -63,7 +63,7 @@ class Unet2dPredictor:
             probs = utils.rotate_array_to_axis(probs, axis)
         return labels, probs
 
-    def predict_single_axis_to_one_hot(self, data_vol, axis):
+    def predict_single_axis_to_one_hot(self, data_vol, axis=Axis.Z):
         prediction, _ = self.predict_single_axis(data_vol, axis=axis)
         return utils.one_hot_encode_array(prediction, self.num_labels)
 
@@ -94,7 +94,7 @@ class Unet2dPredictor:
         )
         logging.info("Merging max of XY and ZX volumes with ZY volume.")
         self.merge_vols_in_mem(prob_container, label_container)
-        return label_container[0]
+        return label_container[0], prob_container[0]
 
     def merge_vols_in_mem(self, prob_container, label_container):
         max_prob_idx = np.argmax(prob_container, axis=0)
