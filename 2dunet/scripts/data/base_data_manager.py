@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 
 import utilities.base_data_utils as utils
-from utilities.settingsdata import SettingsData
+from data.settings_data import SettingsData
 
 
 class BaseDataManager:

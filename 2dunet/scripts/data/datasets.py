@@ -5,8 +5,8 @@ import cv2
 import numpy as np
 from torch.utils.data import Dataset as BaseDataset
 
-from utilities import augmentations as augs
-from utilities.settingsdata import SettingsData
+import data.augmentations as augs
+from data.settings_data import SettingsData
 import utilities.config as cfg
 
 

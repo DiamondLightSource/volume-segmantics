@@ -7,7 +7,7 @@ import h5py as h5
 import sys
 import numpy as np
 from skimage.measure import block_reduce
-from skimage import img_as_ubyte, exposure
+from utilities.base_data_utils import clip_to_uint8
 
 INPUT_FILE_EXT = {"h5", "hdf5", "nxs"}
 # Logging format
@@ -104,50 +104,6 @@ def numpy_from_hdf5(path, hdf5_path='/data', nexus=False, lazy=False):
         return data
     return data, f
 
-def clip_to_uint8(data):
-        """Clips data to a certain number of st_devs of the mean and reduces
-        bit depth to uint8.
-
-        Args:
-            data(np.array): The data to be processed.
-
-        Returns:
-            np.array: A unit8 data array.
-        """
-        logging.info("Clipping data and converting to uint8.")
-        logging.info("Calculating mean intensity:")
-        data_mean = np.nanmean(data)
-        logging.info(f"Mean value: {data_mean}. Calculating standard deviation.")
-        # diff_mat = np.ravel(data - data_mean)
-        # not_nan_size = data.size - np.isnan(diff_mat).sum()
-        # data_st_dev = np.sqrt(np.nansum(diff_mat * diff_mat)/not_nan_size)
-        data_st_dev = np.nanstd(data)
-        data_size = data.size
-        lower_bound = data_mean - (data_st_dev * STDEV_FACTOR)
-        upper_bound = data_mean + (data_st_dev * STDEV_FACTOR)
-        logging.info(f"Std dev: {data_st_dev}. Calculating stats.")
-        with np.errstate(invalid='ignore'):
-            gt_ub = (data > upper_bound).sum()
-            lt_lb = (data < lower_bound).sum()
-        logging.info(f"Lower bound: {lower_bound}, upper bound: {upper_bound}")
-        logging.info(
-            f"Number of voxels above upper bound to be clipped {gt_ub} - percentage {gt_ub/data_size * 100:.3f}%")
-        logging.info(
-            f"Number of voxels below lower bound to be clipped {lt_lb} - percentage {lt_lb/data_size * 100:.3f}%")
-        if np.isnan(data).any():
-            logging.info(f"Replacing NaN values.")
-            data = np.nan_to_num(data, copy=False, nan=data_mean)
-        logging.info("Rescaling intensities.")
-        if np.issubdtype(data.dtype, np.integer):
-            logging.info("Data is already in integer dtype, converting to float for rescaling.")
-            data = data.astype(np.float)
-        data = np.clip(data, lower_bound, upper_bound, out=data)
-        data = np.subtract(data, lower_bound, out=data)
-        data = np.divide(data, (upper_bound - lower_bound), out=data)
-        data = np.clip(data, 0.0, 1.0, out=data)
-        logging.info("Converting to uint8.")
-        data = np.multiply(data, 255, out=data)
-        return data.astype(np.uint8)
 
 def check_coords(coords, data_shape, downsample):
     logging.info("Checking coordinates.")
@@ -239,7 +195,10 @@ if __name__ == "__main__":
         data = block_reduce(data, block_size=block_size, func=np.nanmean)
     
     if clip:
-        data = clip_to_uint8(data)
+        logging.info("Calculating mean of data.")
+        data_mean = np.nanmean(data)
+        logging.info(f"Mean of data is {data_mean}")
+        data = clip_to_uint8(data, data_mean, STDEV_FACTOR)
 
     if data is None:
         data = data_vol

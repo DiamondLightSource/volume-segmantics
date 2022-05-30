@@ -8,9 +8,9 @@ from utilities.base_data_utils import Axis
 import utilities.config as cfg
 from torch import nn as nn
 from tqdm import tqdm
-from utilities.dataloaders import get_2d_prediction_dataloader
-from utilities.settingsdata import SettingsData
-from utilities.unet2d.model import create_unet_from_file
+from data.dataloaders import get_2d_prediction_dataloader
+from data.settings_data import SettingsData
+from unet2d.model import create_unet_from_file
 
 
 class Unet2dPredictor:

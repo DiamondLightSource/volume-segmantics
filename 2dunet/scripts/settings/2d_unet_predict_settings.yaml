@@ -1,10 +1,9 @@
 # Settings for prediction of a 3d volume using a 2d U-net
-quality: high # One of [low, medium, high]
+quality: medium # One of [low, medium, high]
 output_probs: False # If set to True a separate volume of probabilty values for the predictions will be saved alongside the labels.
 clip_data: True # If set to True, the image data intensities will be clipped and rescaled before prediction. Set to False if data is already clipped.
 st_dev_factor: 2.575 # Number of standard deviations from the mean to clip data to.
 data_hdf5_path: /data # Internal path in the HDF5 file where the image data for prediction is stored.
-del_vols: True # Whether to clean up the 16 intermediate predicted volumes to save disk space.
 cuda_device: 0 # Change this if you would like to run the prediction on a different GPU
 downsample: False # If True, data will be downsampled by 2 and segmentation will be upsampled by 2
 one_hot: False # Output one-hot encoded data

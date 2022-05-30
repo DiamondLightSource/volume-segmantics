@@ -18,7 +18,7 @@ from pytorch3dunet.unet3d.losses import BCEDiceLoss, DiceLoss, GeneralizedDiceLo
 from pytorch3dunet.unet3d.metrics import GenericAveragePrecision, MeanIoU
 from tqdm import tqdm
 from utilities.early_stopping import EarlyStopping
-from utilities.unet2d.model import create_unet_on_device
+from unet2d.model import create_unet_on_device
 
 
 class Unet2dTrainer:

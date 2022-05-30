@@ -7,11 +7,11 @@ from datetime import date
 from pathlib import Path
 
 import utilities.config as cfg
-from utilities.cmdline import CheckExt
-from utilities.dataloaders import get_2d_training_dataloaders
-from utilities.settingsdata import SettingsData
-from utilities.slicers.trainingslicers import TrainingDataSlicer
-from utilities.unet2d.trainer import Unet2dTrainer
+from utilities.arg_parsing import CheckExt
+from data.dataloaders import get_2d_training_dataloaders
+from data.settings_data import SettingsData
+from data.slicers import TrainingDataSlicer
+from unet2d.trainer import Unet2dTrainer
 
 
 def init_argparse() -> argparse.ArgumentParser:

@@ -7,12 +7,12 @@ from torch.utils.data import DataLoader, Subset
 
 import utilities.base_data_utils as utils
 import utilities.config as cfg
-from utilities.datasets import (
+from data.datasets import (
     get_2d_prediction_dataset,
     get_2d_training_dataset,
     get_2d_validation_dataset,
 )
-from utilities.settingsdata import SettingsData
+from data.settings_data import SettingsData
 
 
 def get_2d_training_dataloaders(

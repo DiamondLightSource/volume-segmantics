@@ -1,10 +1,9 @@
 from pathlib import Path
 
-import numpy as np
 import utilities.base_data_utils as utils
-from utilities.base_data_manager import BaseDataManager
-from utilities.settingsdata import SettingsData
-from utilities.unet2d.predictor import Unet2dPredictor
+from data.base_data_manager import BaseDataManager
+from data.settings_data import SettingsData
+from unet2d.predictor import Unet2dPredictor
 
 
 class Unet2DPredictionManager(BaseDataManager):

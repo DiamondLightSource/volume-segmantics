@@ -7,10 +7,10 @@ from datetime import date
 from pathlib import Path
 
 from utilities import config as cfg
-from utilities.cmdline import CheckExt
-from utilities.settingsdata import SettingsData
-from utilities.unet2d.prediction_manager import Unet2DPredictionManager
-from utilities.unet2d.predictor import Unet2dPredictor
+from utilities.arg_parsing import CheckExt
+from data.settings_data import SettingsData
+from unet2d.prediction_manager import Unet2DPredictionManager
+from unet2d.predictor import Unet2dPredictor
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
