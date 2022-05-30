@@ -68,7 +68,7 @@ def rotate_array_to_axis(array: np.array, axis: Axis = Axis.Z) -> np.array:
         return array.swapaxes(0, 2)
 
 
-def one_hot_encode_array(input_array, num_labels):
+def one_hot_encode_array(input_array: np.array, num_labels: int) -> np.array:
     """Modified from https://stackoverflow.com/questions/36960320/convert-a-2d-matrix-to-a-3d-one-hot-matrix-numpy"""
     ncols = num_labels
     out = np.zeros((ncols, input_array.size), dtype=np.uint8)
@@ -77,17 +77,14 @@ def one_hot_encode_array(input_array, num_labels):
     return out
 
 
-def prepare_training_batch(batch: "list[torch.tensor]", device: int, num_labels):
+def prepare_training_batch(
+    batch: "list[torch.Tensor]", device: int, num_labels: int
+) -> "tuple[torch.Tensor, torch.Tensor]":
     inputs = batch[0].to(device)
-    targets = batch[1]
+    targets = batch[1].to(torch.int64)
     # One hot encode the channels
-    # TODO Replace with torch.nn.functional.one_hot
-    channels = []
-    for label_num in range(num_labels):
-        channel = torch.zeros_like(targets)
-        channel[targets == label_num] = 1
-        channels.append(channel)
-    targets = torch.stack(channels, 1).to(device, dtype=torch.uint8)
+    targets = torch.nn.functional.one_hot(targets, num_classes=num_labels)
+    targets = targets.permute((0, 3, 1, 2)).to(device, dtype=torch.uint8)
     return inputs, targets
 
 
