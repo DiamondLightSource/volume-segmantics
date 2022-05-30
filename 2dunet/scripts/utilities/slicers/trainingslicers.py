@@ -26,7 +26,7 @@ class TrainingDataSlicer(BaseDataManager):
         self.multilabel = False
         self.settings = settings
         self.label_vol_path = Path(label_vol_path)
-        self.seg_vol = utils.get_numpy_from_path(
+        self.seg_vol, _ = utils.get_numpy_from_path(
             self.label_vol_path, internal_path=settings.seg_hdf5_path
         )
         self.preprocess_labels()

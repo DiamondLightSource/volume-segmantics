@@ -15,7 +15,7 @@ class BaseDataManager:
         self.settings = settings
         self.st_dev_factor = settings.st_dev_factor
         self.downsample = settings.downsample
-        self.data_vol = utils.get_numpy_from_path(
+        self.data_vol, self.input_data_chunking = utils.get_numpy_from_path(
             self.data_vol_path, internal_path=settings.data_hdf5_path
         )
         self.preprocess_data()
@@ -28,7 +28,9 @@ class BaseDataManager:
         self.data_mean = np.nanmean(self.data_vol)
         logging.info(f"Mean value: {self.data_mean}")
         if self.settings.clip_data:
-            self.data_vol = utils.clip_to_uint8(self.data_vol,self.data_mean, self.st_dev_factor)
+            self.data_vol = utils.clip_to_uint8(
+                self.data_vol, self.data_mean, self.st_dev_factor
+            )
         if np.isnan(self.data_vol).any():
             logging.info(f"Replacing NaN values.")
             self.data_vol = np.nan_to_num(self.data_vol, copy=False)

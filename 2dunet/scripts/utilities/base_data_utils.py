@@ -1,8 +1,9 @@
 import logging
+import pathlib
 import sys
 from enum import Enum
 from itertools import chain, product
-from typing import List
+from typing import List, Union, Tuple
 
 import h5py as h5
 import imageio
@@ -107,7 +108,8 @@ def numpy_from_tiff(path):
 
 
 def numpy_from_hdf5(path, hdf5_path="/data", nexus=False):
-    """Returns a numpy array when given a path to an HDF5 file.
+    """Returns a numpy array  and chunking info when given a path
+    to an HDF5 file.
 
     The data is assumed to be found in '/data' in the file.
 
@@ -116,7 +118,8 @@ def numpy_from_hdf5(path, hdf5_path="/data", nexus=False):
         hdf5_path (str): The internal HDF5 path to the data.
 
     Returns:
-        numpy.array: A numpy array object for the data stored in the HDF5 file.
+        tuple(numpy.array, tuple(int, int)) : A numpy array
+        for the data and a tuple with the chunking size.
     """
 
     data_handle = h5.File(path, "r")
@@ -136,22 +139,26 @@ def numpy_from_hdf5(path, hdf5_path="/data", nexus=False):
                 sys.exit(1)
     else:
         dataset = data_handle[hdf5_path]
-    # self.input_data_chunking = dataset.chunks
-    return dataset[()]
+    input_data_chunking = dataset.chunks
+    return dataset[()], input_data_chunking
 
 
-def get_numpy_from_path(path, internal_path="/data"):
-    """Helper function that returns numpy array according to file extension.
+def get_numpy_from_path(
+    path: pathlib.Path, internal_path: str = "/data"
+) -> Tuple[np.array, Union[Tuple[int, int], bool]]:
+    """Helper function that returns numpy array and chunking(if used)
+    according to file extension.
 
     Args:
-        path (pathlib.Path): The path to the data file.
-        internal_path (str, optional): Internal path within HDF5 file. Defaults to "/data".
+        path (pathlib.Path): Path to file
+        internal_path (str, optional): Path inside HDF5 file. Defaults to "/data".
 
     Returns:
-        numpy.ndarray: Numpy array from the file given in the path.
+        Tuple[np.array, Union[Tuple[int, int], bool]]: Tuple with data array and
+        either chunking tuple, or True.
     """
     if path.suffix in cfg.TIFF_SUFFIXES:
-        return numpy_from_tiff(path)
+        return numpy_from_tiff(path), True
     elif path.suffix in cfg.HDF5_SUFFIXES:
         nexus = path.suffix == ".nxs"
         return numpy_from_hdf5(path, hdf5_path=internal_path, nexus=nexus)

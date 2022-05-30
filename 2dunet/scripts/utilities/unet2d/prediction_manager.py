@@ -12,7 +12,6 @@ class Unet2DPredictionManager(BaseDataManager):
         self, predictor: Unet2dPredictor, data_vol_path: str, settings: SettingsData
     ) -> None:
         super().__init__(data_vol_path, settings)
-        self.input_data_chunking = None
         self.predictor = predictor
         self.settings = settings
 
@@ -41,8 +40,12 @@ class Unet2DPredictionManager(BaseDataManager):
                 prediction, probs = self.predictor.predict_12_ways_max_probs(
                     self.data_vol
                 )
-        utils.save_data_to_hdf5(prediction, output_path)
+        utils.save_data_to_hdf5(
+            prediction, output_path, chunking=self.input_data_chunking
+        )
         if probs is not None and self.settings.output_probs:
             utils.save_data_to_hdf5(
-                probs, f"{output_path.parent / output_path.stem}_probs.h5"
+                probs,
+                f"{output_path.parent / output_path.stem}_probs.h5",
+                chunking=self.input_data_chunking,
             )
