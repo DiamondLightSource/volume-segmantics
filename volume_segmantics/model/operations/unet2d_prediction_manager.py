@@ -3,7 +3,7 @@ from pathlib import Path
 import utilities.base_data_utils as utils
 from data.base_data_manager import BaseDataManager
 from data.settings_data import SettingsData
-from unet2d.predictor import Unet2dPredictor
+from model.operations import Unet2dPredictor
 
 
 class Unet2DPredictionManager(BaseDataManager):
