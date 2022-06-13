@@ -1,9 +1,9 @@
 from pathlib import Path
 
-import utilities.base_data_utils as utils
-from data.base_data_manager import BaseDataManager
-from data.settings_data import SettingsData
-from model.operations import Unet2dPredictor
+import volume_segmantics.utilities.base_data_utils as utils
+from volume_segmantics.data.base_data_manager import BaseDataManager
+from volume_segmantics.data.settings_data import SettingsData
+from volume_segmantics.model.operations.unet2d_predictor import Unet2dPredictor
 
 
 class Unet2DPredictionManager(BaseDataManager):

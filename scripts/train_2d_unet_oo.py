@@ -7,11 +7,11 @@ from datetime import date
 from pathlib import Path
 
 import volume_segmantics.utilities.config as cfg
-from volume_segmantics.utilities.arg_parsing import CheckExt
 from volume_segmantics.data.dataloaders import get_2d_training_dataloaders
 from volume_segmantics.data.settings_data import SettingsData
 from volume_segmantics.data.slicers import TrainingDataSlicer
 from volume_segmantics.model.operations.unet2d_trainer import Unet2dTrainer
+from volume_segmantics.utilities.arg_parsing import CheckExt
 
 
 def init_argparse() -> argparse.ArgumentParser:

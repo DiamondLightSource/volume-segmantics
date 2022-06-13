@@ -3,14 +3,14 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import utilities.base_data_utils as utils
-from utilities.base_data_utils import Axis
-import utilities.config as cfg
+import volume_segmantics.utilities.base_data_utils as utils
+import volume_segmantics.utilities.config as cfg
 from torch import nn as nn
 from tqdm import tqdm
-from data.dataloaders import get_2d_prediction_dataloader
-from data.settings_data import SettingsData
-from unet2d.model import create_unet_from_file
+from volume_segmantics.data.dataloaders import get_2d_prediction_dataloader
+from volume_segmantics.data.settings_data import SettingsData
+from volume_segmantics.model.unet2d import create_unet_from_file
+from volume_segmantics.utilities.base_data_utils import Axis
 
 
 class Unet2dPredictor:
