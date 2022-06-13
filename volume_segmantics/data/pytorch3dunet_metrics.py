@@ -1,3 +1,8 @@
+"""
+    This file is taken from Adrian Wolny's pytorch-3dunet repository found at
+    https://github.com/wolny/pytorch-3dunet
+"""
+
 import importlib
 
 import numpy as np
