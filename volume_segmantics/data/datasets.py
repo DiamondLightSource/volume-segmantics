@@ -3,11 +3,10 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+import volume_segmantics.data.augmentations as augs
+import volume_segmantics.utilities.config as cfg
 from torch.utils.data import Dataset as BaseDataset
-
-import data.augmentations as augs
-from data.settings_data import SettingsData
-import utilities.config as cfg
+from volume_segmantics.data.settings_data import SettingsData
 
 
 class Unet2dDataset(BaseDataset):

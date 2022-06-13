@@ -1,11 +1,7 @@
 import math
 
-from matplotlib.pyplot import get
-
-import utilities
-
-import utilities.config as cfg
 import albumentations as A
+import volume_segmantics.utilities.config as cfg
 from albumentations.pytorch.transforms import ToTensorV2
 
 

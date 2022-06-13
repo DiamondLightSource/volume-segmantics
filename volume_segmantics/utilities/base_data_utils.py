@@ -12,8 +12,8 @@ import torch
 import torchvision.transforms.functional as F
 from skimage.measure import block_reduce
 
-import utilities.config as cfg
-from data.settings_data import SettingsData
+import volume_segmantics.utilities.config as cfg
+from volume_segmantics.data.settings_data import SettingsData
 
 
 class Quality(Enum):

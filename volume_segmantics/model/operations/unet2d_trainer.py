@@ -11,14 +11,16 @@ import termplotlib as tpl
 mpl.use("Agg")
 import torch
 import torch.nn as nn
-import utilities.base_data_utils as utils
-import utilities.config as cfg
+import volume_segmantics.utilities.base_data_utils as utils
+import volume_segmantics.utilities.config as cfg
 from matplotlib import pyplot as plt
-from pytorch3dunet.unet3d.losses import BCEDiceLoss, DiceLoss, GeneralizedDiceLoss
-from pytorch3dunet.unet3d.metrics import GenericAveragePrecision, MeanIoU
 from tqdm import tqdm
-from utilities.early_stopping import EarlyStopping
-from unet2d.model import create_unet_on_device
+from volume_segmantics.data.pytorch3dunet_losses import (BCEDiceLoss, DiceLoss,
+                                                         GeneralizedDiceLoss)
+from volume_segmantics.data.pytorch3dunet_metrics import (
+    GenericAveragePrecision, MeanIoU)
+from volume_segmantics.model.unet2d import create_unet_on_device
+from volume_segmantics.utilities.early_stopping import EarlyStopping
 
 
 class Unet2dTrainer:

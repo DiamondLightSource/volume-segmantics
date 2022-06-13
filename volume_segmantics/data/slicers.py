@@ -1,13 +1,12 @@
-import glob
 import logging
 import os
 from pathlib import Path
 
 import numpy as np
-import utilities.base_data_utils as utils
+import volume_segmantics.utilities.base_data_utils as utils
 from skimage import img_as_ubyte, io
 from tqdm import tqdm
-from data.base_data_manager import BaseDataManager
+from volume_segmantics.data.base_data_manager import BaseDataManager
 
 
 class TrainingDataSlicer(BaseDataManager):

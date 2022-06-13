@@ -2,9 +2,8 @@ import logging
 from pathlib import Path
 
 import numpy as np
-
-import utilities.base_data_utils as utils
-from data.settings_data import SettingsData
+import volume_segmantics.utilities.base_data_utils as utils
+from volume_segmantics.data.settings_data import SettingsData
 
 
 class BaseDataManager:

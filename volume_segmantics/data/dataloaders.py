@@ -3,16 +3,13 @@ from typing import Tuple
 
 import numpy as np
 import torch
+import volume_segmantics.utilities.base_data_utils as utils
+import volume_segmantics.utilities.config as cfg
 from torch.utils.data import DataLoader, Subset
-
-import utilities.base_data_utils as utils
-import utilities.config as cfg
-from data.datasets import (
-    get_2d_prediction_dataset,
-    get_2d_training_dataset,
-    get_2d_validation_dataset,
-)
-from data.settings_data import SettingsData
+from volume_segmantics.data.datasets import (get_2d_prediction_dataset,
+                                             get_2d_training_dataset,
+                                             get_2d_validation_dataset)
+from volume_segmantics.data.settings_data import SettingsData
 
 
 def get_2d_training_dataloaders(
