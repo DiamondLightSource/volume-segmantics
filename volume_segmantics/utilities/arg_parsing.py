@@ -1,6 +1,8 @@
 import argparse
 from pathlib import Path
 
+import volume_segmantics.utilities.config as cfg
+
 
 def CheckExt(choices):
     """Wrapper to return the class
@@ -31,3 +33,48 @@ def CheckExt(choices):
                 parser.error(f"The file {str(fname)} does not appear to exist.")
 
     return Act
+
+
+def get_2d_training_parser() -> argparse.ArgumentParser:
+    """Argument parser for scripts that train a 2d network on a 3d volume.
+
+    Returns:
+        argparse.ArgumentParser: An argument parser with the appropriate
+        command line args contained within.
+    """
+    parser = argparse.ArgumentParser(
+        usage="%(prog)s --data <path(s)/to/data/file(s)> --labels <path(s)/to/segmentation/file(s)> --data_dir path/to/data_directory",
+        description="Train a 2d U-net model on the 3d data and corresponding"
+        " segmentation provided in the files.",
+    )
+    parser.add_argument(
+        "-v", "--version", action="version", version=f"{parser.prog} version 1.0.0"
+    )
+    parser.add_argument(
+        "--" + cfg.TRAIN_DATA_ARG,
+        metavar="Path(s) to training image data volume(s)",
+        type=str,
+        action=CheckExt(cfg.TRAIN_DATA_EXT),
+        nargs="+",
+        required=True,
+        help="the path(s) to file(s) containing the imaging data volume for training",
+    )
+    parser.add_argument(
+        "--" + cfg.LABEL_DATA_ARG,
+        metavar="Path(s) to label volume(s)",
+        type=str,
+        action=CheckExt(cfg.LABEL_DATA_EXT),
+        nargs="+",
+        required=True,
+        help="the path(s) to file(s) containing a segmented volume for training",
+    )
+    parser.add_argument(
+        "--" + cfg.DATA_DIR_ARG,
+        metavar="Path to settings and output directory (optional)",
+        type=str,
+        nargs="?",
+        default=Path.cwd(),
+        help='path to a directory containing the "unet-settings", data will be also be output to this location',
+    )
+    return parser
+
