@@ -32,7 +32,8 @@ BIG_CUDA_PRED_BATCH = 12 # Size of prediction batch on big GPU
 SMALL_CUDA_BATCH = 4 # Size of batch on small GPU
 NUM_WORKERS = 8 # Number of parallel workers for training/validation dataloaders
 PIN_CUDA_MEMORY = True # Whether to pin CUDA memory for faster data transfer
-UNET_DIVISOR = 32 # Image dimensions need to be a multiple of this value 
+UNET_DIVISOR = 32 # Image dimensions need to be a multiple of this value
+MODEL_INPUT_CHANNELS = 1 # Use 1 for grayscale input images 
 
 DEFAULT_MIN_LR = 0.00075 # Learning rate to return if LR finder fails
 

@@ -29,9 +29,10 @@ lr_reduce_factor: 500 # Divisor for start and end LR when finding LR on reloaded
 
 # Parameters to control unet architecture
 model:
-  # choose encoder, e.g. mobilenet_v2 or efficientnet-b7
+  # For more details on encoder types please see smp.readthedocs.io
+  # choose encoder, those tested so far include the following:
+  # ["resnet34", "resnext50_32x4d"]
   encoder_name: "resnet34"
    # use `imagenet` pre-trained weights for encoder initialization
   encoder_weights: "imagenet"
-  # number of input channels to the model
-  in_channels: 1
+  

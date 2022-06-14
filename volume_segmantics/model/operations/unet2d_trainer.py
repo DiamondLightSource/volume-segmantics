@@ -47,11 +47,16 @@ class Unet2dTrainer:
         self.patience = settings.patience
         self.loss_criterion = self.get_loss_criterion()
         self.eval_metric = self.get_eval_metric()
-        self.model_struc_dict = settings.model
-        self.model_struc_dict["classes"] = self.label_no
+        self.model_struc_dict = self.get_model_struc_dict(settings)
         self.avg_train_losses = []  # per epoch training loss
         self.avg_valid_losses = []  #  per epoch validation loss
         self.avg_eval_scores = []  #  per epoch evaluation score
+
+    def get_model_struc_dict(self, settings):
+        model_struc_dict = settings.model
+        model_struc_dict["in_channels"] = cfg.MODEL_INPUT_CHANNELS
+        model_struc_dict["classes"] = self.label_no
+        return model_struc_dict
 
     def calculate_log_lr_ratio(self):
         return math.log(self.end_lr / self.starting_lr)
