@@ -16,10 +16,10 @@ def get_train_preprocess_augs(img_size: int) -> A.core.composition.Compose:
 
 
 def get_padded_dimension(dimension):
-    unet_divisor = cfg.UNET_DIVISOR
-    if dimension % unet_divisor == 0:
+    image_divisor = cfg.IM_SIZE_DIVISOR
+    if dimension % image_divisor == 0:
         return dimension
-    return (math.floor(dimension / unet_divisor) + 1) * unet_divisor
+    return (math.floor(dimension / image_divisor) + 1) * image_divisor
 
 
 def get_pred_preprocess_augs(

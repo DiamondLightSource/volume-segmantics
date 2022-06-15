@@ -5,11 +5,13 @@ import sys
 from datetime import date
 from pathlib import Path
 
+import volume_segmantics.utilities.base_data_utils as utils
 import volume_segmantics.utilities.config as cfg
 from volume_segmantics.data.dataloaders import get_2d_training_dataloaders
 from volume_segmantics.data.settings_data import SettingsData
 from volume_segmantics.data.slicers import TrainingDataSlicer
-from volume_segmantics.model.operations.unet2d_trainer import Unet2dTrainer
+from volume_segmantics.model.operations.vol_seg_2d_trainer import \
+    VolSeg2dTrainer
 from volume_segmantics.utilities.arg_parsing import get_2d_training_parser
 
 
@@ -50,12 +52,13 @@ def main():
     train_loader, valid_loader = get_2d_training_dataloaders(
         data_im_out_dir, seg_im_out_dir, settings
     )
-    # Set up the UnetTrainer
-    trainer = Unet2dTrainer(train_loader, valid_loader, max_label_no, settings)
+    # Set up the 2dTrainer
+    trainer = VolSeg2dTrainer(train_loader, valid_loader, max_label_no, settings)
     # Train the model, first frozen, then unfrozen
     num_cyc_frozen = settings.num_cyc_frozen
     num_cyc_unfrozen = settings.num_cyc_unfrozen
-    model_fn = f"{date.today()}_{settings.model_output_fn}.pytorch"
+    model_type = settings.model["type"].name
+    model_fn = f"{date.today()}_{model_type}_{settings.model_output_fn}.pytorch"
     model_out = Path(root_path, model_fn)
     if num_cyc_frozen > 0:
         trainer.train_model(

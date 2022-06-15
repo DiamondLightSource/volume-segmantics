@@ -3,12 +3,12 @@ from pathlib import Path
 import volume_segmantics.utilities.base_data_utils as utils
 from volume_segmantics.data.base_data_manager import BaseDataManager
 from volume_segmantics.data.settings_data import SettingsData
-from volume_segmantics.model.operations.unet2d_predictor import Unet2dPredictor
+from volume_segmantics.model.operations.vol_seg_2d_predictor import VolSeg2dPredictor
 
 
-class Unet2DPredictionManager(BaseDataManager):
+class VolSeg2DPredictionManager(BaseDataManager):
     def __init__(
-        self, predictor: Unet2dPredictor, data_vol_path: str, settings: SettingsData
+        self, predictor: VolSeg2dPredictor, data_vol_path: str, settings: SettingsData
     ) -> None:
         super().__init__(data_vol_path, settings)
         self.predictor = predictor

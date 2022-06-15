@@ -28,8 +28,32 @@ class Axis(Enum):
     X = 2
 
 
+class ModelType(Enum):
+    U_NET = 1
+    U_NET_PLUS_PLUS = 2
+    FPN = 3
+    DEEPLABV3 = 4
+    DEEPLABV3_PLUS = 5
+
+
+def create_enum_from_setting(setting_str, enum):
+    try:
+        output_enum = enum[setting_str.upper()]
+    except KeyError:
+        options = [k.name for k in enum]
+        logging.error(f"{enum.__name__}: {setting_str} is not valid. Options are {options}.")
+        sys.exit(1)
+    return output_enum
+
+
 def get_prediction_quality(settings: SettingsData) -> Enum:
-    return Quality[settings.quality.upper()]
+    pred_quality = create_enum_from_setting(settings.quality, Quality)
+    return pred_quality
+
+
+def get_model_type(settings: SettingsData) -> Enum:
+    model_type = create_enum_from_setting(settings.model["type"], ModelType)
+    return model_type
 
 
 def get_batch_size(settings: SettingsData, prediction: bool = False) -> int:
@@ -37,7 +61,7 @@ def get_batch_size(settings: SettingsData, prediction: bool = False) -> int:
     cuda_device_num = settings.cuda_device
     total_gpu_mem = torch.cuda.get_device_properties(cuda_device_num).total_memory
     allocated_gpu_mem = torch.cuda.memory_allocated(cuda_device_num)
-    free_gpu_mem = (total_gpu_mem - allocated_gpu_mem) / 1024 ** 3
+    free_gpu_mem = (total_gpu_mem - allocated_gpu_mem) / 1024**3
 
     if free_gpu_mem < cfg.BIG_CUDA_THRESHOLD:
         batch_size = cfg.SMALL_CUDA_BATCH

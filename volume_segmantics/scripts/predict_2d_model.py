@@ -7,17 +7,17 @@ from pathlib import Path
 
 import volume_segmantics.utilities.config as cfg
 from volume_segmantics.data.settings_data import SettingsData
-from volume_segmantics.model.operations.unet2d_prediction_manager import (
-    Unet2DPredictionManager,
+from volume_segmantics.model.operations.vol_seg_prediction_manager import (
+    VolSeg2DPredictionManager,
 )
-from volume_segmantics.model.operations.unet2d_predictor import Unet2dPredictor
+from volume_segmantics.model.operations.vol_seg_2d_predictor import VolSeg2dPredictor
 from volume_segmantics.utilities.arg_parsing import get_2d_prediction_parser
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
 def create_output_path(root_path, data_vol_path):
-    pred_out_fn = f"{date.today()}_{data_vol_path.stem}_2dUnet_vol_pred.h5"
+    pred_out_fn = f"{date.today()}_{data_vol_path.stem}_2d_model_vol_pred.h5"
     return Path(root_path, pred_out_fn)
 
 
@@ -31,10 +31,10 @@ def main():
     settings_path = Path(root_path, cfg.SETTINGS_DIR, cfg.PREDICTION_SETTINGS_FN)
     settings = SettingsData(settings_path)
     model_file_path = getattr(args, cfg.MODEL_PTH_ARG)
-    predictor = Unet2dPredictor(model_file_path, settings)
+    predictor = VolSeg2dPredictor(model_file_path, settings)
     data_vol_path = Path(getattr(args, cfg.PREDICT_DATA_ARG))
     output_path = create_output_path(root_path, data_vol_path)
-    pred_manager = Unet2DPredictionManager(predictor, data_vol_path, settings)
+    pred_manager = VolSeg2DPredictionManager(predictor, data_vol_path, settings)
     pred_manager.predict_volume_to_path(output_path)
 
 

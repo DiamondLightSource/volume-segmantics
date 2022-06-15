@@ -1,4 +1,5 @@
 import csv
+from distutils.command.config import config
 import logging
 import math
 import sys
@@ -19,12 +20,12 @@ from volume_segmantics.data.pytorch3dunet_losses import (BCEDiceLoss, DiceLoss,
                                                          GeneralizedDiceLoss)
 from volume_segmantics.data.pytorch3dunet_metrics import (
     GenericAveragePrecision, MeanIoU)
-from volume_segmantics.model.unet2d import create_unet_on_device
+from volume_segmantics.model.model_2d import create_model_on_device
 from volume_segmantics.utilities.early_stopping import EarlyStopping
 
 
-class Unet2dTrainer:
-    """Class that utlises 2d dataloaders to train a 2d Unet.
+class VolSeg2dTrainer:
+    """Class that utlises 2d dataloaders to train a 2d deep learning model.
 
     Args:
         sampler
@@ -54,6 +55,8 @@ class Unet2dTrainer:
 
     def get_model_struc_dict(self, settings):
         model_struc_dict = settings.model
+        model_type = utils.get_model_type(settings)
+        model_struc_dict["type"] = model_type
         model_struc_dict["in_channels"] = cfg.MODEL_INPUT_CHANNELS
         model_struc_dict["classes"] = self.label_no
         return model_struc_dict
@@ -61,9 +64,9 @@ class Unet2dTrainer:
     def calculate_log_lr_ratio(self):
         return math.log(self.end_lr / self.starting_lr)
 
-    def create_unet_and_optimiser(self, learning_rate, frozen=False):
+    def create_model_and_optimiser(self, learning_rate, frozen=False):
         logging.info(f"Setting up the model on device {self.settings.cuda_device}.")
-        self.model = create_unet_on_device(self.model_device_num, self.model_struc_dict)
+        self.model = create_model_on_device(self.model_device_num, self.model_struc_dict)
         if frozen:
             self.freeze_model()
         logging.info(
@@ -142,21 +145,21 @@ class Unet2dTrainer:
         eval_scores = []
 
         if create:
-            self.create_unet_and_optimiser(self.starting_lr, frozen=frozen)
+            self.create_model_and_optimiser(self.starting_lr, frozen=frozen)
             lr_to_use = self.run_lr_finder()
             # Recreate model and start training
-            self.create_unet_and_optimiser(lr_to_use, frozen=frozen)
+            self.create_model_and_optimiser(lr_to_use, frozen=frozen)
             early_stopping = self.create_early_stopping(output_path, patience)
         else:
             # Reduce starting LR, since model alreadiy partiallly trained
             self.starting_lr /= self.lr_reduce_factor
             self.end_lr /= self.lr_reduce_factor
             self.log_lr_ratio = self.calculate_log_lr_ratio()
-            self.load_in_unet_and_optimizer(
+            self.load_in_model_and_optimizer(
                 self.starting_lr, output_path, frozen=frozen, optimizer=False
             )
             lr_to_use = self.run_lr_finder()
-            min_loss = self.load_in_unet_and_optimizer(
+            min_loss = self.load_in_model_and_optimizer(
                 self.starting_lr, output_path, frozen=frozen, optimizer=False
             )
             early_stopping = self.create_early_stopping(
@@ -228,10 +231,10 @@ class Unet2dTrainer:
         # load the last checkpoint with the best model
         self.load_in_weights(output_path)
 
-    def load_in_unet_and_optimizer(
+    def load_in_model_and_optimizer(
         self, learning_rate, output_path, frozen=False, optimizer=False
     ):
-        self.create_unet_and_optimiser(learning_rate, frozen=frozen)
+        self.create_model_and_optimiser(learning_rate, frozen=frozen)
         logging.info("Loading in weights from saved checkpoint.")
         loss_val = self.load_in_weights(output_path, optimizer=optimizer)
         return loss_val
@@ -312,6 +315,7 @@ class Unet2dTrainer:
 
         Returns:
             float: The learning rate at the point when loss was falling most steeply
+            divided by a fudge factor.
         """
         default_min_lr = cfg.DEFAULT_MIN_LR  # Add as default value to fix bug
         # Get loss values and their corresponding gradients, and get lr values
@@ -321,12 +325,18 @@ class Unet2dTrainer:
             lr_find_loss[i] = lr_find_loss[i].detach().numpy()
         losses = np.array(lr_find_loss)
         try:
-            min_loss_grad_idx = (np.gradient(losses)).argmin()
-        except:
-            logging.info("Failed to compute gradients, returning default value.")
+            gradients = np.gradient(losses)
+            min_gradient = gradients.min()
+            if min_gradient < 0:
+                min_loss_grad_idx = gradients.argmin()
+            else:
+                logging.info(f"Minimum gradient: {min_gradient} was positive, returning default value instead.")
+                return default_min_lr
+        except Exception as e:
+            logging.info(f"Failed to compute gradients, returning default value. {e}")
             return default_min_lr
         min_lr = lr_find_lr[min_loss_grad_idx]
-        return min_lr
+        return min_lr / cfg.LR_DIVISOR
 
     def lr_exp_stepper(self, x):
         """Exponentially increase learning rate as part of strategy to find the

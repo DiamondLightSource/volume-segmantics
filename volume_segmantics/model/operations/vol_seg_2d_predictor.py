@@ -9,18 +9,18 @@ from torch import nn as nn
 from tqdm import tqdm
 from volume_segmantics.data.dataloaders import get_2d_prediction_dataloader
 from volume_segmantics.data.settings_data import SettingsData
-from volume_segmantics.model.unet2d import create_unet_from_file
+from volume_segmantics.model.model_2d import create_model_from_file
 from volume_segmantics.utilities.base_data_utils import Axis
 
 
-class Unet2dPredictor:
+class VolSeg2dPredictor:
     """Class that performs U-Net prediction operations. Does not interact with disk."""
 
     def __init__(self, model_file_path: str, settings: SettingsData) -> None:
         self.model_file_path = Path(model_file_path)
         self.settings = settings
         self.model_device_num = int(settings.cuda_device)
-        self.model, self.num_labels = create_unet_from_file(
+        self.model, self.num_labels = create_model_from_file(
             self.model_file_path, self.model_device_num
         )
 

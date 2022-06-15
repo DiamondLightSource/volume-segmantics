@@ -9,7 +9,7 @@ from torch.utils.data import Dataset as BaseDataset
 from volume_segmantics.data.settings_data import SettingsData
 
 
-class Unet2dDataset(BaseDataset):
+class VolSeg2dDataset(BaseDataset):
     """Read images, apply augmentation and preprocessing transformations.
 
     Args:
@@ -87,7 +87,7 @@ class Unet2dDataset(BaseDataset):
         ]
 
 
-class Unet2dPredictionDataset(BaseDataset):
+class VolSeg2dPredictionDataset(BaseDataset):
     """Splits 3D data volume into 2D images for inference.
 
     Args:
@@ -147,10 +147,10 @@ class Unet2dPredictionDataset(BaseDataset):
 
 def get_2d_training_dataset(
     image_dir: Path, label_dir: Path, settings: SettingsData
-) -> Unet2dDataset:
+) -> VolSeg2dDataset:
 
     img_size = settings.image_size
-    return Unet2dDataset(
+    return VolSeg2dDataset(
         image_dir,
         label_dir,
         preprocessing=augs.get_train_preprocess_augs(img_size),
@@ -161,10 +161,10 @@ def get_2d_training_dataset(
 
 def get_2d_validation_dataset(
     image_dir: Path, label_dir: Path, settings: SettingsData
-) -> Unet2dDataset:
+) -> VolSeg2dDataset:
 
     img_size = settings.image_size
-    return Unet2dDataset(
+    return VolSeg2dDataset(
         image_dir,
         label_dir,
         preprocessing=augs.get_train_preprocess_augs(img_size),
@@ -172,9 +172,9 @@ def get_2d_validation_dataset(
     )
 
 
-def get_2d_prediction_dataset(data_vol: np.array) -> Unet2dPredictionDataset:
+def get_2d_prediction_dataset(data_vol: np.array) -> VolSeg2dPredictionDataset:
     y_dim, x_dim = data_vol.shape[1:]
-    return Unet2dPredictionDataset(
+    return VolSeg2dPredictionDataset(
         data_vol,
         preprocessing=augs.get_pred_preprocess_augs(y_dim, x_dim),
         postprocessing=augs.get_postprocess_augs(),

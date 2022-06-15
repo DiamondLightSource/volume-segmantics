@@ -75,7 +75,7 @@ def get_2d_training_parser() -> argparse.ArgumentParser:
         type=str,
         nargs="?",
         default=Path.cwd(),
-        help='path to a directory containing the "unet-settings", data will be also be output to this location',
+        help='path to a directory containing the "volseg-settings", data will be also be output to this location',
     )
     return parser
 
@@ -115,6 +115,6 @@ def get_2d_prediction_parser() -> argparse.ArgumentParser:
         type=str,
         nargs="?",
         default=Path.cwd(),
-        help='path to a directory containing the "unet-settings", data will be also be output to this location',
+        help='path to a directory containing the "volseg-settings", data will be also be output to this location',
     )
     return parser

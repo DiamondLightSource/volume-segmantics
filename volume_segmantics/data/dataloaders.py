@@ -45,6 +45,7 @@ def get_2d_training_dataloaders(
         shuffle=True,
         num_workers=cfg.NUM_WORKERS,
         pin_memory=cfg.PIN_CUDA_MEMORY,
+        drop_last=True,
     )
     validation_dataloader = DataLoader(
         validation_dataset,
