@@ -1,3 +1,4 @@
-# Unet Segmentation
+# Volume Segmantics
 
-A place to store some Unet segmentation workbooks and scripts
+A toolkit for semantic segmentation of volumetric data using PyTorch deep learning models
+
