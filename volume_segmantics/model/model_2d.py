@@ -28,6 +28,12 @@ def create_model_on_device(device_num: int, model_struc_dict: dict) -> torch.nn.
     elif model_type == utils.ModelType.DEEPLABV3_PLUS:
         model = smp.DeepLabV3Plus(**struct_dict_copy)
         logging.info(f"Sending the DeepLabV3+ model to device {device_num}")
+    elif model_type == utils.ModelType.MA_NET:
+        model = smp.MAnet(**struct_dict_copy)
+        logging.info(f"Sending the MA-Net model to device {device_num}")
+    elif model_type == utils.ModelType.LINKNET:
+        model = smp.Linknet(**struct_dict_copy)
+        logging.info(f"Sending the Linknet model to device {device_num}")
     return model.to(device_num)
 
 

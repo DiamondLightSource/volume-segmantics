@@ -36,7 +36,7 @@ IM_SIZE_DIVISOR = 32 # Image dimensions need to be a multiple of this value
 MODEL_INPUT_CHANNELS = 1 # Use 1 for grayscale input images 
 
 DEFAULT_MIN_LR = 0.00075 # Learning rate to return if LR finder fails
-LR_DIVISOR = 5 # Divide the automatically calculated learning rate (min gradient) by this magic number
+LR_DIVISOR = 3 # Divide the automatically calculated learning rate (min gradient) by this magic number
 
 IMAGENET_MEAN = 0.449 # Mean value for single channel imagnet normalisation
 IMAGENET_STD = 0.226 # Standard deviation for single channel imagenet normalisation

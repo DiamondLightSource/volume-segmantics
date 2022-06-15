@@ -31,10 +31,11 @@ lr_reduce_factor: 500 # Divisor for start and end LR when finding LR on reloaded
 model:
   # Choose type of segmenation model from the list of those tested so far
   # ["U_Net", "U_Net_Plus_plus", "FPN", "DeepLabV3", "DeepLabV3_Plus"]
+  # "MA_Net", "Linknet"]
   type: "U_Net"
   # For more details on encoder types please see smp.readthedocs.io
   # choose encoder, those tested so far include the following:
-  # ["resnet34", "resnext50_32x4d"]
+  # ["resnet34", "resnet50", "resnext50_32x4d"]
   encoder_name: "resnet34"
    # use `imagenet` pre-trained weights for encoder initialization
   encoder_weights: "imagenet"
