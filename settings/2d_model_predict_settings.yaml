@@ -1,5 +1,5 @@
 # Settings for prediction of a 3d volume using a 2d U-net
-quality: medium # One of [low, medium, high]
+quality: medium # One of [low, medium, high]. low = Single axis, medium = 3 axis, high = 12 ways
 output_probs: False # If set to True a separate volume of probabilty values for the predictions will be saved alongside the labels.
 clip_data: True # If set to True, the image data intensities will be clipped and rescaled before prediction. Set to False if data is already clipped.
 st_dev_factor: 2.575 # Number of standard deviations from the mean to clip data to.
