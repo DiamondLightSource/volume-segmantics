@@ -1,22 +1,29 @@
 import logging
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Union
 
 import numpy as np
 import volume_segmantics.utilities.base_data_utils as utils
 
 
 class BaseDataManager:
-    def __init__(self, data_vol_path: str, settings: SimpleNamespace) -> None:
+    def __init__(
+        self, data_vol: Union[str, np.ndarray], settings: SimpleNamespace
+    ) -> None:
         self.data_vol_shape = None
         self.data_mean = None
-        self.data_vol_path = Path(data_vol_path)
+        self.data_vol_path = Path(data_vol) if isinstance(data_vol, str) else None
         self.settings = settings
         self.st_dev_factor = settings.st_dev_factor
         self.downsample = settings.downsample
-        self.data_vol, self.input_data_chunking = utils.get_numpy_from_path(
-            self.data_vol_path, internal_path=settings.data_hdf5_path
-        )
+        if self.data_vol_path is not None:
+            self.data_vol, self.input_data_chunking = utils.get_numpy_from_path(
+                self.data_vol_path, internal_path=settings.data_hdf5_path
+            )
+        elif isinstance(data_vol, np.ndarray):
+            self.data_vol = data_vol
+            self.input_data_chunking = True
         self.preprocess_data()
 
     def preprocess_data(self):

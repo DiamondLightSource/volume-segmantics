@@ -7,6 +7,7 @@ import volume_segmantics.utilities.base_data_utils as utils
 from skimage import img_as_ubyte, io
 from tqdm import tqdm
 from volume_segmantics.data.base_data_manager import BaseDataManager
+from typing import Union
 
 class TrainingDataSlicer(BaseDataManager):
     """Class that converts 3d data volumes into 2d image slices on disk for
@@ -17,16 +18,19 @@ class TrainingDataSlicer(BaseDataManager):
         settings (SimpleNamespace): An initialised object with settings data.
     """
 
-    def __init__(self, settings, data_vol_path, label_vol_path):
-        super().__init__(data_vol_path, settings)
+    def __init__(self, settings, data_vol: Union[str, np.ndarray], label_vol: Union[str, np.ndarray]):
+        super().__init__(data_vol, settings)
         self.data_im_out_dir = None
         self.seg_im_out_dir = None
         self.multilabel = False
         self.settings = settings
-        self.label_vol_path = Path(label_vol_path)
-        self.seg_vol, _ = utils.get_numpy_from_path(
-            self.label_vol_path, internal_path=settings.seg_hdf5_path
-        )
+        self.label_vol_path = Path(label_vol) if isinstance(label_vol, str) else None
+        if self.label_vol_path is not None:
+            self.seg_vol, _ = utils.get_numpy_from_path(
+                self.label_vol_path, internal_path=settings.seg_hdf5_path
+            )
+        elif isinstance(label_vol, np.ndarray):
+            self.seg_vol = label_vol
         self.preprocess_labels()
 
     def preprocess_labels(self):
