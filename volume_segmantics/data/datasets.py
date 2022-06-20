@@ -1,12 +1,12 @@
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import cv2
 import numpy as np
 import volume_segmantics.data.augmentations as augs
 import volume_segmantics.utilities.config as cfg
 from torch.utils.data import Dataset as BaseDataset
-from volume_segmantics.data.settings_data import SettingsData
 
 
 class VolSeg2dDataset(BaseDataset):
@@ -146,7 +146,7 @@ class VolSeg2dPredictionDataset(BaseDataset):
 
 
 def get_2d_training_dataset(
-    image_dir: Path, label_dir: Path, settings: SettingsData
+    image_dir: Path, label_dir: Path, settings: SimpleNamespace
 ) -> VolSeg2dDataset:
 
     img_size = settings.image_size
@@ -160,7 +160,7 @@ def get_2d_training_dataset(
 
 
 def get_2d_validation_dataset(
-    image_dir: Path, label_dir: Path, settings: SettingsData
+    image_dir: Path, label_dir: Path, settings: SimpleNamespace
 ) -> VolSeg2dDataset:
 
     img_size = settings.image_size

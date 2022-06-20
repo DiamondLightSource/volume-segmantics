@@ -8,14 +8,13 @@ from skimage import img_as_ubyte, io
 from tqdm import tqdm
 from volume_segmantics.data.base_data_manager import BaseDataManager
 
-
 class TrainingDataSlicer(BaseDataManager):
     """Class that converts 3d data volumes into 2d image slices on disk for
     model training.
     Slicing is carried in all of the xy (z), xz (y) and yz (x) planes.
 
     Args:
-        settings (SettingsData): An initialised SettingsData object.
+        settings (SimpleNamespace): An initialised object with settings data.
     """
 
     def __init__(self, settings, data_vol_path, label_vol_path):
@@ -107,7 +106,7 @@ class TrainingDataSlicer(BaseDataManager):
                 data = img_as_ubyte(data)
             if not self.multilabel:
                 data[data > 1] = 1
-        io.imsave(f"{path}.png", data)
+        io.imsave(f"{path}.png", data, check_contrast=False)
 
     def delete_image_dir(self, im_dir_path):
         if im_dir_path.exists():

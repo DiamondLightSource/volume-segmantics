@@ -1,13 +1,13 @@
 import logging
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import volume_segmantics.utilities.base_data_utils as utils
-from volume_segmantics.data.settings_data import SettingsData
 
 
 class BaseDataManager:
-    def __init__(self, data_vol_path: str, settings: SettingsData) -> None:
+    def __init__(self, data_vol_path: str, settings: SimpleNamespace) -> None:
         self.data_vol_shape = None
         self.data_mean = None
         self.data_vol_path = Path(data_vol_path)

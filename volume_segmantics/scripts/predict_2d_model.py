@@ -6,11 +6,11 @@ from datetime import date
 from pathlib import Path
 
 import volume_segmantics.utilities.config as cfg
-from volume_segmantics.data.settings_data import SettingsData
-from volume_segmantics.model.operations.vol_seg_prediction_manager import (
-    VolSeg2DPredictionManager,
-)
-from volume_segmantics.model.operations.vol_seg_2d_predictor import VolSeg2dPredictor
+from volume_segmantics.data.settings_data import get_settings_data
+from volume_segmantics.model.operations.vol_seg_2d_predictor import \
+    VolSeg2dPredictor
+from volume_segmantics.model.operations.vol_seg_prediction_manager import \
+    VolSeg2DPredictionManager
 from volume_segmantics.utilities.arg_parsing import get_2d_prediction_parser
 
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -29,7 +29,7 @@ def main():
     args = parser.parse_args()
     root_path = Path(getattr(args, cfg.DATA_DIR_ARG)).resolve()
     settings_path = Path(root_path, cfg.SETTINGS_DIR, cfg.PREDICTION_SETTINGS_FN)
-    settings = SettingsData(settings_path)
+    settings = get_settings_data(settings_path)
     model_file_path = getattr(args, cfg.MODEL_PTH_ARG)
     predictor = VolSeg2dPredictor(model_file_path, settings)
     data_vol_path = Path(getattr(args, cfg.PREDICT_DATA_ARG))

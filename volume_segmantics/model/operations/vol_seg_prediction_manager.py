@@ -1,14 +1,15 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 import volume_segmantics.utilities.base_data_utils as utils
 from volume_segmantics.data.base_data_manager import BaseDataManager
-from volume_segmantics.data.settings_data import SettingsData
-from volume_segmantics.model.operations.vol_seg_2d_predictor import VolSeg2dPredictor
+from volume_segmantics.model.operations.vol_seg_2d_predictor import \
+    VolSeg2dPredictor
 
 
 class VolSeg2DPredictionManager(BaseDataManager):
     def __init__(
-        self, predictor: VolSeg2dPredictor, data_vol_path: str, settings: SettingsData
+        self, predictor: VolSeg2dPredictor, data_vol_path: str, settings: SimpleNamespace
     ) -> None:
         super().__init__(data_vol_path, settings)
         self.predictor = predictor

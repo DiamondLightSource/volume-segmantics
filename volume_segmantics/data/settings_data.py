@@ -1,31 +1,25 @@
-# -*- coding: utf-8 -*-
-"""Data utilities for U-net training and prediction.
-"""
 import logging
 import sys
-import warnings
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Union
 
 import yaml
 
-warnings.filterwarnings("ignore", category=UserWarning)
 
-
-class SettingsData:
-    """Class to store settings from a YAML settings file.
-
-    Args:
-        settings_path (pathlib.Path): Path to the YAML file containing user settings.
+def get_settings_data(path: Union[Path, None]) -> SimpleNamespace:
+    """Creates an object to hold settings data. If a path to to a YAML file,
+    the settings are read in from that file. If the path is None, an empty namespace
+    is returned.
     """
-    def __init__(self, settings_path):
-        logging.info(f"Loading settings from {settings_path}")
-        if settings_path.exists():
-            self.settings_path = settings_path
-            with open(settings_path, 'r') as stream:
-                self.settings_dict = yaml.safe_load(stream)
+    if path is None:
+        return SimpleNamespace()
+    else:
+        logging.info(f"Loading settings from {path}")
+        if path.exists():
+            with open(path, "r") as stream:
+                settings_dict = yaml.safe_load(stream)
+            return SimpleNamespace(**settings_dict)
         else:
             logging.error("Couldn't find settings file... Exiting!")
             sys.exit(1)
-
-        # Set the data as attributes
-        for k, v in self.settings_dict.items():
-            setattr(self, k, v)

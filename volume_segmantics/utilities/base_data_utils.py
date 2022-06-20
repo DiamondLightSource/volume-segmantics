@@ -3,6 +3,7 @@ import pathlib
 import sys
 from enum import Enum
 from itertools import chain, product
+from types import SimpleNamespace
 from typing import List, Union, Tuple
 
 import h5py as h5
@@ -13,7 +14,7 @@ import torchvision.transforms.functional as F
 from skimage.measure import block_reduce
 
 import volume_segmantics.utilities.config as cfg
-from volume_segmantics.data.settings_data import SettingsData
+from types import SimpleNamespace
 
 
 class Quality(Enum):
@@ -43,22 +44,24 @@ def create_enum_from_setting(setting_str, enum):
         output_enum = enum[setting_str.upper()]
     except KeyError:
         options = [k.name for k in enum]
-        logging.error(f"{enum.__name__}: {setting_str} is not valid. Options are {options}.")
+        logging.error(
+            f"{enum.__name__}: {setting_str} is not valid. Options are {options}."
+        )
         sys.exit(1)
     return output_enum
 
 
-def get_prediction_quality(settings: SettingsData) -> Enum:
+def get_prediction_quality(settings: SimpleNamespace) -> Enum:
     pred_quality = create_enum_from_setting(settings.quality, Quality)
     return pred_quality
 
 
-def get_model_type(settings: SettingsData) -> Enum:
+def get_model_type(settings: SimpleNamespace) -> Enum:
     model_type = create_enum_from_setting(settings.model["type"], ModelType)
     return model_type
 
 
-def get_batch_size(settings: SettingsData, prediction: bool = False) -> int:
+def get_batch_size(settings: SimpleNamespace, prediction: bool = False) -> int:
 
     cuda_device_num = settings.cuda_device
     total_gpu_mem = torch.cuda.get_device_properties(cuda_device_num).total_memory

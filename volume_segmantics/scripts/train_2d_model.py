@@ -5,10 +5,9 @@ import sys
 from datetime import date
 from pathlib import Path
 
-import volume_segmantics.utilities.base_data_utils as utils
+from volume_segmantics.data.settings_data import get_settings_data
 import volume_segmantics.utilities.config as cfg
 from volume_segmantics.data.dataloaders import get_2d_training_dataloaders
-from volume_segmantics.data.settings_data import SettingsData
 from volume_segmantics.data.slicers import TrainingDataSlicer
 from volume_segmantics.model.operations.vol_seg_2d_trainer import \
     VolSeg2dTrainer
@@ -32,7 +31,7 @@ def main():
         sys.exit(1)
     # Create the settings object
     settings_path = Path(root_path, cfg.SETTINGS_DIR, cfg.TRAIN_SETTINGS_FN)
-    settings = SettingsData(settings_path)
+    settings = get_settings_data(settings_path)
     data_im_out_dir = root_path / settings.data_im_dirname  # dir for data imgs
     seg_im_out_dir = root_path / settings.seg_im_out_dirname  # dir for seg imgs
     # Keep track of the number of labels

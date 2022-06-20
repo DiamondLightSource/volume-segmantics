@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Tuple
 
 import numpy as np
@@ -9,11 +10,10 @@ from torch.utils.data import DataLoader, Subset
 from volume_segmantics.data.datasets import (get_2d_prediction_dataset,
                                              get_2d_training_dataset,
                                              get_2d_validation_dataset)
-from volume_segmantics.data.settings_data import SettingsData
 
 
 def get_2d_training_dataloaders(
-    image_dir: Path, label_dir: Path, settings: SettingsData
+    image_dir: Path, label_dir: Path, settings: SimpleNamespace
 ) -> Tuple[DataLoader, DataLoader]:
     """Returns 2d training and validation dataloaders with indices split at random
     according to the percentage split specified in settings.
@@ -21,7 +21,7 @@ def get_2d_training_dataloaders(
     Args:
         image_dir (Path): Directory of data images
         label_dir (Path): Directory of label images
-        settings (SettingsData): Settings object
+        settings (SimpleNamespace): Settings object
 
     Returns:
         Tuple[DataLoader, DataLoader]: 2d training and validation dataloaders
@@ -58,7 +58,7 @@ def get_2d_training_dataloaders(
 
 
 def get_2d_prediction_dataloader(
-    data_vol: np.array, settings: SettingsData
+    data_vol: np.array, settings: SimpleNamespace
 ) -> DataLoader:
     pred_dataset = get_2d_prediction_dataset(data_vol)
     batch_size = utils.get_batch_size(settings, prediction=True)
