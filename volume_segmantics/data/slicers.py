@@ -30,7 +30,7 @@ class TrainingDataSlicer(BaseDataManager):
         self.seg_im_out_dir = None
         self.multilabel = False
         self.settings = settings
-        self.label_vol_path = utils.setup_path_if_exists(data_vol)
+        self.label_vol_path = utils.setup_path_if_exists(label_vol)
         if self.label_vol_path is not None:
             self.seg_vol, _ = utils.get_numpy_from_path(
                 self.label_vol_path, internal_path=settings.seg_hdf5_path
