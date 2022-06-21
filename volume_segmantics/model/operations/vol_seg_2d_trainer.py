@@ -4,6 +4,7 @@ import logging
 import math
 import sys
 import time
+from typing import Union
 
 import matplotlib as mpl
 import numpy as np
@@ -32,10 +33,11 @@ class VolSeg2dTrainer:
         settings
     """
 
-    def __init__(self, training_loader, validation_loader, label_no, settings):
+    def __init__(self, training_loader, validation_loader, labels: Union[int, dict], settings):
         self.training_loader = training_loader
         self.validation_loader = validation_loader
-        self.label_no = label_no
+        self.label_no = labels if isinstance(labels, int) else len(labels)
+        self.codes = labels if isinstance(labels, dict) else {}
         self.settings = settings
         # Params for learning rate finder
         self.starting_lr = float(settings.starting_lr)
@@ -222,7 +224,7 @@ class VolSeg2dTrainer:
 
             # early_stopping needs the validation loss to check if it has decreased,
             # and if it has, it will make a checkpoint of the current model
-            early_stopping(self.avg_valid_losses[-1], self.model, self.optimizer)
+            early_stopping(self.avg_valid_losses[-1], self.model, self.optimizer, self.codes)
 
             if early_stopping.early_stop:
                 logging.info("Early stopping")

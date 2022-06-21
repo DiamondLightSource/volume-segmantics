@@ -9,6 +9,7 @@ from tqdm import tqdm
 from volume_segmantics.data.base_data_manager import BaseDataManager
 from typing import Union
 
+
 class TrainingDataSlicer(BaseDataManager):
     """Class that converts 3d data volumes into 2d image slices on disk for
     model training.
@@ -18,7 +19,12 @@ class TrainingDataSlicer(BaseDataManager):
         settings (SimpleNamespace): An initialised object with settings data.
     """
 
-    def __init__(self, settings, data_vol: Union[str, np.ndarray], label_vol: Union[str, np.ndarray]):
+    def __init__(
+        self,
+        settings,
+        data_vol: Union[str, np.ndarray],
+        label_vol: Union[str, np.ndarray],
+    ):
         super().__init__(data_vol, settings)
         self.data_im_out_dir = None
         self.seg_im_out_dir = None

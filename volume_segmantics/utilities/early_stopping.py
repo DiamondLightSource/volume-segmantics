@@ -29,13 +29,13 @@ class EarlyStopping:
         self.path = path
         self.model_struc_dict = model_dict # Dictionary with parameters controlling architecture
 
-    def __call__(self, val_loss, model, optimizer):
+    def __call__(self, val_loss, model, optimizer, label_codes):
 
         score = -val_loss
 
         if self.best_score is None:
             self.best_score = score
-            self.save_checkpoint(val_loss, model, optimizer)
+            self.save_checkpoint(val_loss, model, optimizer, label_codes)
         elif score < self.best_score + self.delta:
             self.counter += 1
             logging.info(
@@ -44,10 +44,10 @@ class EarlyStopping:
                 self.early_stop = True
         else:
             self.best_score = score
-            self.save_checkpoint(val_loss, model, optimizer)
+            self.save_checkpoint(val_loss, model, optimizer, label_codes)
             self.counter = 0
 
-    def save_checkpoint(self, val_loss, model, optimizer):
+    def save_checkpoint(self, val_loss, model, optimizer, label_codes):
         '''Saves model when validation loss decrease.'''
         if self.verbose:
             logging.info(
@@ -57,6 +57,7 @@ class EarlyStopping:
             "model_struc_dict": self.model_struc_dict,
             "optimizer_state_dict": optimizer.state_dict(),
             "loss_val": val_loss,
+            "label_codes": label_codes,
         }        
         torch.save(model_dict, self.path)
         self.val_loss_min = val_loss
