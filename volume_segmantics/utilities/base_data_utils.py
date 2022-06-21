@@ -15,6 +15,7 @@ from skimage.measure import block_reduce
 
 import volume_segmantics.utilities.config as cfg
 from types import SimpleNamespace
+from pathlib import Path
 
 
 class Quality(Enum):
@@ -59,6 +60,15 @@ def get_prediction_quality(settings: SimpleNamespace) -> Enum:
 def get_model_type(settings: SimpleNamespace) -> Enum:
     model_type = create_enum_from_setting(settings.model["type"], ModelType)
     return model_type
+
+
+def setup_path_if_exists(input_param):
+    if isinstance(input_param, str):
+        return Path(input_param)
+    elif isinstance(input_param, Path):
+        return input_param
+    else:
+        return None
 
 
 def get_batch_size(settings: SimpleNamespace, prediction: bool = False) -> int:

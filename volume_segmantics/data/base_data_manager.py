@@ -13,7 +13,7 @@ class BaseDataManager:
     ) -> None:
         self.data_vol_shape = None
         self.data_mean = None
-        self.data_vol_path = self.setup_data_vol_path(data_vol)
+        self.data_vol_path = utils.setup_path_if_exists(data_vol)
         self.settings = settings
         self.st_dev_factor = settings.st_dev_factor
         self.downsample = settings.downsample
@@ -25,15 +25,6 @@ class BaseDataManager:
             self.data_vol = data_vol
             self.input_data_chunking = True
         self.preprocess_data()
-
-    @staticmethod
-    def setup_data_vol_path(data_vol):
-        if isinstance(data_vol, str):
-            return Path(data_vol)
-        elif isinstance(data_vol, Path):
-            return data_vol
-        else:
-            return None
 
     def preprocess_data(self):
         if self.downsample:
