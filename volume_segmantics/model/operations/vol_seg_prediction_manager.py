@@ -1,17 +1,22 @@
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Union
+
+import numpy as np
 
 import volume_segmantics.utilities.base_data_utils as utils
 from volume_segmantics.data.base_data_manager import BaseDataManager
-from volume_segmantics.model.operations.vol_seg_2d_predictor import \
-    VolSeg2dPredictor
+from volume_segmantics.model.operations.vol_seg_2d_predictor import VolSeg2dPredictor
 
 
 class VolSeg2DPredictionManager(BaseDataManager):
     def __init__(
-        self, predictor: VolSeg2dPredictor, data_vol_path: str, settings: SimpleNamespace
+        self,
+        predictor: VolSeg2dPredictor,
+        data_vol: Union[str, np.ndarray],
+        settings: SimpleNamespace,
     ) -> None:
-        super().__init__(data_vol_path, settings)
+        super().__init__(data_vol, settings)
         self.predictor = predictor
         self.settings = settings
 
@@ -49,3 +54,7 @@ class VolSeg2DPredictionManager(BaseDataManager):
                 f"{output_path.parent / output_path.stem}_probs.h5",
                 chunking=self.input_data_chunking,
             )
+
+    def predict_fast_volume_to_ram(self) -> np.ndarray:
+        prediction, _ = self.predictor.predict_single_axis(self.data_vol)
+        return prediction
