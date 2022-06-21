@@ -41,6 +41,8 @@ class ModelType(Enum):
 
 
 def create_enum_from_setting(setting_str, enum):
+    if isinstance(setting_str, Enum):
+        return setting_str
     try:
         output_enum = enum[setting_str.upper()]
     except KeyError:
