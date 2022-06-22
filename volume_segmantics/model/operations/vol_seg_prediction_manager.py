@@ -20,10 +20,13 @@ class VolSeg2DPredictionManager(BaseDataManager):
         self.predictor = predictor
         self.settings = settings
 
-    def predict_volume_to_path(self, output_path: Path) -> None:
+    def predict_volume_to_path(
+        self, output_path: Union[Path, None], quality: Union[utils.Quality, None] = None
+    ) -> np.ndarray:
         probs = None
         one_hot = self.settings.one_hot
-        quality = utils.get_prediction_quality(self.settings)
+        if quality is None:
+            quality = utils.get_prediction_quality(self.settings)
         if quality == utils.Quality.LOW:
             if one_hot:
                 prediction = self.predictor.predict_single_axis_to_one_hot(
@@ -45,16 +48,14 @@ class VolSeg2DPredictionManager(BaseDataManager):
                 prediction, probs = self.predictor.predict_12_ways_max_probs(
                     self.data_vol
                 )
-        utils.save_data_to_hdf5(
-            prediction, output_path, chunking=self.input_data_chunking
-        )
-        if probs is not None and self.settings.output_probs:
+        if output_path is not None:
             utils.save_data_to_hdf5(
-                probs,
-                f"{output_path.parent / output_path.stem}_probs.h5",
-                chunking=self.input_data_chunking,
+                prediction, output_path, chunking=self.input_data_chunking
             )
-
-    def predict_fast_volume_to_ram(self) -> np.ndarray:
-        prediction, _ = self.predictor.predict_single_axis(self.data_vol)
+            if probs is not None and self.settings.output_probs:
+                utils.save_data_to_hdf5(
+                    probs,
+                    f"{output_path.parent / output_path.stem}_probs.h5",
+                    chunking=self.input_data_chunking,
+                )
         return prediction
