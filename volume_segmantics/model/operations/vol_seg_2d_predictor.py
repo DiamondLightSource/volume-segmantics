@@ -20,9 +20,10 @@ class VolSeg2dPredictor:
         self.model_file_path = Path(model_file_path)
         self.settings = settings
         self.model_device_num = int(settings.cuda_device)
-        self.model, self.num_labels = create_model_from_file(
+        model_tuple = create_model_from_file(
             self.model_file_path, self.model_device_num
         )
+        self.model, self.num_labels, self.label_codes = model_tuple
 
     def get_model_from_trainer(self, trainer):
         self.model = trainer.model

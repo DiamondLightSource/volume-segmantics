@@ -38,8 +38,8 @@ def create_model_on_device(device_num: int, model_struc_dict: dict) -> torch.nn.
 
 
 def create_model_from_file(
-    weights_fn: Path, gpu: bool = True, device_num: int = 0
-) -> Tuple[torch.nn.Module, int]:
+    weights_fn: Path, gpu: bool = True, device_num: int = 0,
+) -> Tuple[torch.nn.Module, int, dict]:
     """Creates and returns a model and the number of segmentation labels
     that are predicted by the model."""
     if gpu:
@@ -52,4 +52,4 @@ def create_model_from_file(
     model = create_model_on_device(device_num, model_dict["model_struc_dict"])
     logging.info("Loading in the saved weights.")
     model.load_state_dict(model_dict["model_state_dict"])
-    return model, model_dict["model_struc_dict"]["classes"]
+    return model, model_dict["model_struc_dict"]["classes"], model_dict["label_codes"]
