@@ -5,13 +5,12 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from volume_segmantics.data.settings_data import get_settings_data
 import volume_segmantics.utilities.config as cfg
-from volume_segmantics.data.dataloaders import get_2d_training_dataloaders
-from volume_segmantics.data.slicers import TrainingDataSlicer
-from volume_segmantics.model.operations.vol_seg_2d_trainer import \
-    VolSeg2dTrainer
-from volume_segmantics.utilities.arg_parsing import get_2d_training_parser
+from volume_segmantics.data import (TrainingDataSlicer,
+                                    get_2d_training_dataloaders,
+                                    get_settings_data)
+from volume_segmantics.model import VolSeg2dTrainer
+from volume_segmantics.utilities import get_2d_training_parser
 
 
 def main():

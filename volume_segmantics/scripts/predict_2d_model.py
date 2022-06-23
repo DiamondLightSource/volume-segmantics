@@ -6,12 +6,10 @@ from datetime import date
 from pathlib import Path
 
 import volume_segmantics.utilities.config as cfg
-from volume_segmantics.data.settings_data import get_settings_data
-from volume_segmantics.model.operations.vol_seg_2d_predictor import \
-    VolSeg2dPredictor
-from volume_segmantics.model.operations.vol_seg_prediction_manager import \
-    VolSeg2DPredictionManager
-from volume_segmantics.utilities.arg_parsing import get_2d_prediction_parser
+from volume_segmantics.data import get_settings_data
+from volume_segmantics.model import (VolSeg2DPredictionManager,
+                                     VolSeg2dPredictor)
+from volume_segmantics.utilities import get_2d_prediction_parser
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
