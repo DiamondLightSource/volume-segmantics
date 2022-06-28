@@ -12,17 +12,17 @@ At present, the easiest way to install is to create a new conda enviroment or vi
 
 ## Configuration and command line use
 
-After installation, two new commands will be available from your terminal whilst your environment is activated, `2d-model-train` and `2d-model-predict`.
+After installation, two new commands will be available from your terminal whilst your environment is activated, `model-train-2d` and `model-predict-2d`.
 
 These commands require access to some settings stored in YAML files. These need to be located in a directory named `volseg-settings` within the directory where you are running the commands. The settings files can be copied from [here](https://gitlab.diamond.ac.uk/data-analysis/imaging/unet-segmentation/-/tree/packaging/settings). 
 
-The file `2d_model_train_settings.yaml` can be edited in order to change training parameters such as number of epochs, loss functions, evaluation metrics and also model and encoder architectures. The file `2d_model_predict_settings.yaml` can be edited to change parameters such as the prediction "quality" e.g "low" quality refers to prediction of the volume segmentation by taking images along a single axis (images in the (x,y) plane). For "medium" and "high" quality, predictions are done along 3 axes and in 12 directions respectively, before being combined by maximum probability. 
+The file `2d_model_train_settings.yaml` can be edited in order to change training parameters such as number of epochs, loss functions, evaluation metrics and also model and encoder architectures. The file `2d_model_predict_settings.yaml` can be edited to change parameters such as the prediction "quality" e.g "low" quality refers to prediction of the volume segmentation by taking images along a single axis (images in the (x,y) plane). For "medium" and "high" quality, predictions are done along 3 axes and in 12 directions (3 axes, 4 rotations) respectively, before being combined by maximum probability. 
 
 ### For training a 2d model on a 3d image volume and corresponding labels
 Run the following command. Input files can be in HDF5 or multipage TIFF format.
 
 ```shell
-2d-model-train --data path/to/image/data.h5 --labels path/to/corresponding/segmentation/labels.h5
+model-train-2d --data path/to/image/data.h5 --labels path/to/corresponding/segmentation/labels.h5
 ```
 
 A model will be trained according to the settings defined in `/volseg-settings/2d_model_train_settings.yaml` and saved to your working directory. In addition, a figure showing "ground truth" segmentation vs model segmentation for some images in the validation set will be saved. 
@@ -31,7 +31,7 @@ A model will be trained according to the settings defined in `/volseg-settings/2
 Run the following command. Input image files can be in HDF5 or multipage TIFF format.
 
 ```shell
-2d-model-predict path/to/model_file.pytorch path/to/data_for_prediction.h5
+model-predict-2d path/to/model_file.pytorch path/to/data_for_prediction.h5
 ```
 
 The input data will be segmented using the input model following the settings specified in `volseg-settings/2d_model_predict_settings.yaml`. An HDF5 file containing the segmented volume will be saved to your working directory.

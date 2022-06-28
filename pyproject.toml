@@ -26,12 +26,13 @@ termplotlib = "^0.3.6"
 
 [tool.poetry.dev-dependencies]
 black = "^22.1.0"
+pdoc = ">=10"
 pylint = "^2.4.0"
 pytest = "^4.2.0"
 
 [tool.poetry.scripts]
-2d-model-train = 'volume_segmantics.scripts.train_2d_model:main'
-2d-model-predict = 'volume_segmantics.scripts.predict_2d_model:main'
+model-train-2d = 'volume_segmantics.scripts.train_2d_model:main'
+model-predict-2d = 'volume_segmantics.scripts.predict_2d_model:main'
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
