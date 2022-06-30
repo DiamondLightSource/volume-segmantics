@@ -25,10 +25,19 @@ segmentation-models-pytorch = "^0.2.1"
 termplotlib = "^0.3.6"
 
 [tool.poetry.dev-dependencies]
-black = "^22.1.0"
+black = ">=22.1.0"
 pdoc = ">=10"
-pylint = "^2.4.0"
-pytest = "^4.2.0"
+pylint = ">=2.4.0"
+pytest = ">=6"
+pytest-cov = "*"
+
+[tool.pytest.ini_options]
+addopts = "-v --cov=volume_segmantics --cov-report term-missing"
+pythonpath = ["."]
+testpaths = [
+    "tests",
+]
+filterwarnings = "ignore::DeprecationWarning"
 
 [tool.poetry.scripts]
 model-train-2d = 'volume_segmantics.scripts.train_2d_model:main'

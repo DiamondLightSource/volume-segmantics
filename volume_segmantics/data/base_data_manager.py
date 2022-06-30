@@ -9,7 +9,7 @@ import volume_segmantics.utilities.base_data_utils as utils
 
 class BaseDataManager:
     def __init__(
-        self, data_vol: Union[str, np.ndarray], settings: SimpleNamespace
+        self, data_vol: Union[Path, str, np.ndarray], settings: SimpleNamespace
     ) -> None:
         self.data_vol_shape = None
         self.data_mean = None
