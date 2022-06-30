@@ -35,6 +35,10 @@ class TestBaseDataManagerInit:
     def test_init_path_array_exists(self, base_dm_path):
         assert isinstance(base_dm_path.data_vol, np.ndarray)
 
+    def test_init_path_tiff_array_exists(self, rand_int_tiff_path, training_settings):
+        base_dm = BaseDataManager(rand_int_tiff_path, training_settings)
+        assert isinstance(base_dm.data_vol, np.ndarray)
+
     def test_init_int_vol_type(self, base_dm_int_vol):
         assert isinstance(base_dm_int_vol, BaseDataManager)
 

@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 import volume_segmantics.utilities.config as cfg
 from volume_segmantics.data import get_settings_data
+from imageio import volwrite
 
 
 def del_dir(target):
@@ -80,4 +81,10 @@ def rand_int_hdf5_path(tmp_path, rand_int_volume, training_settings):
     output_path = tmp_path / "random_int_vol.h5"
     with h5.File(output_path, "w") as f:
         f[training_settings.data_hdf5_path] = rand_int_volume
+    return output_path
+
+@pytest.fixture()
+def rand_int_tiff_path(tmp_path, rand_int_volume):
+    output_path = tmp_path / "random_int_vol.tiff"
+    volwrite(output_path, rand_int_volume)
     return output_path
