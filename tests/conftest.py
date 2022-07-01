@@ -4,8 +4,9 @@ import h5py as h5
 import numpy as np
 import pytest
 import volume_segmantics.utilities.config as cfg
-from volume_segmantics.data import get_settings_data
 from imageio import volwrite
+from skimage import io, img_as_ubyte
+from volume_segmantics.data import get_settings_data
 
 
 def del_dir(target):
@@ -83,8 +84,33 @@ def rand_int_hdf5_path(tmp_path, rand_int_volume, training_settings):
         f[training_settings.data_hdf5_path] = rand_int_volume
     return output_path
 
+
 @pytest.fixture()
 def rand_int_tiff_path(tmp_path, rand_int_volume):
     output_path = tmp_path / "random_int_vol.tiff"
     volwrite(output_path, rand_int_volume)
     return output_path
+
+
+@pytest.fixture()
+def image_dir(empty_dir):
+    dir_path = empty_dir / "data"
+    dir_path.mkdir(exist_ok=True)
+    for i in range(20):
+        im = np.random.randint(256, size=(243, 345)).astype(np.uint8)
+        path = dir_path / f"data_z_stack_{i}"
+        io.imsave(f"{path}.png", im, check_contrast=False)
+    yield dir_path
+    del_dir(dir_path)
+
+
+@pytest.fixture()
+def label_dir(empty_dir):
+    dir_path = empty_dir / "seg"
+    dir_path.mkdir(exist_ok=True)
+    for i in range(20):
+        im = np.random.randint(4, size=(243, 345)).astype(np.uint8)
+        path = dir_path / f"seg_z_stack_{i}"
+        io.imsave(f"{path}.png", im, check_contrast=False)
+    yield dir_path
+    del_dir(dir_path)

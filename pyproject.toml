@@ -33,10 +33,12 @@ pytest-cov = "*"
 
 [tool.pytest.ini_options]
 addopts = "-v --cov=volume_segmantics --cov-report term-missing"
-pythonpath = ["."]
 testpaths = [
     "tests",
 ]
+markers = [
+    "gpu: marks tests that require a GPU (deselect with '-m \"not gpu\"')",
+    ]
 filterwarnings = "ignore::DeprecationWarning"
 
 [tool.poetry.scripts]
