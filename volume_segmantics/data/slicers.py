@@ -48,8 +48,7 @@ class TrainingDataSlicer(BaseDataManager):
             "Number of classes in segmentation dataset:" f" {self.num_seg_classes}"
         )
         logging.info(f"These classes are: {seg_classes}")
-        if seg_classes[0] != 0:
-            # TODO: Check if label classes are sequential
+        if seg_classes[0] != 0 or not utils.sequential_labels(seg_classes):
             logging.info("Fixing label classes.")
             self.fix_label_classes(seg_classes)
         self.codes = [f"label_val_{i}" for i in seg_classes]

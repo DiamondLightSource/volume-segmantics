@@ -205,6 +205,13 @@ def get_numpy_from_path(
         return numpy_from_hdf5(path, hdf5_path=internal_path, nexus=nexus)
 
 
+def sequential_labels(unique_labels: np.array) -> bool:
+    if not np.where(np.diff(unique_labels) != 1)[0].size:
+        return True
+    else:
+        return False
+
+
 def clip_to_uint8(data: np.array, data_mean: float, st_dev_factor: float) -> np.array:
     """Clips data to a certain number of st_devs of the mean and reduces
     bit depth to uint8.
