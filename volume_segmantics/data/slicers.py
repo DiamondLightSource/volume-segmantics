@@ -21,9 +21,9 @@ class TrainingDataSlicer(BaseDataManager):
 
     def __init__(
         self,
-        settings,
         data_vol: Union[str, np.ndarray],
         label_vol: Union[str, np.ndarray],
+        settings,
     ):
         super().__init__(data_vol, settings)
         self.data_im_out_dir = None

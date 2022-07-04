@@ -38,7 +38,7 @@ def main():
     label_codes = None
     # Set up the DataSlicer and slice the data volumes into image files
     for count, (data_vol_path, label_vol_path) in enumerate(zip(data_vols, label_vols)):
-        slicer = TrainingDataSlicer(settings, data_vol_path, label_vol_path)
+        slicer = TrainingDataSlicer(data_vol_path, label_vol_path, settings)
         data_prefix, label_prefix = f"data{count}", f"seg{count}"
         slicer.output_data_slices(data_im_out_dir, data_prefix)
         slicer.output_label_slices(seg_im_out_dir, label_prefix)
