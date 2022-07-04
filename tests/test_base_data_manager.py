@@ -3,7 +3,6 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from tests.conftest import rand_float_nan_volume
 from volume_segmantics.data.base_data_manager import BaseDataManager
 
 

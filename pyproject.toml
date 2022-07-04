@@ -39,7 +39,7 @@ testpaths = [
 markers = [
     "gpu: marks tests that require a GPU (deselect with '-m \"not gpu\"')",
     ]
-filterwarnings = "ignore::DeprecationWarning"
+filterwarnings = ["ignore:.*Downcasting*:UserWarning"]
 
 [tool.poetry.scripts]
 model-train-2d = 'volume_segmantics.scripts.train_2d_model:main'

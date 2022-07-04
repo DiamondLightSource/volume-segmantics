@@ -240,7 +240,7 @@ def clip_to_uint8(data: np.array, data_mean: float, st_dev_factor: float) -> np.
         logging.info(
             "Data is already in integer dtype, converting to float for rescaling."
         )
-        data = data.astype(np.float)
+        data = data.astype(float)
     data = np.clip(data, lower_bound, upper_bound, out=data)
     data = np.subtract(data, lower_bound, out=data)
     data = np.divide(data, (upper_bound - lower_bound), out=data)

@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import volume_segmantics.utilities.config as cfg
 from imageio import volwrite
-from skimage import io, img_as_ubyte
+from skimage import img_as_ubyte, io
 from volume_segmantics.data import get_settings_data
 
 
@@ -42,16 +42,23 @@ def cwd():
 
 
 @pytest.fixture()
-def training_settings(cwd):
-    settings_path = Path(cwd.parent, "settings", cfg.TRAIN_SETTINGS_FN)
-    training_settings = get_settings_data(settings_path)
-    return training_settings
+def training_settings_path(cwd):
+    return Path(cwd.parent, "settings", cfg.TRAIN_SETTINGS_FN)
 
 
 @pytest.fixture()
-def prediction_settings(cwd):
-    settings_path = Path(cwd.parent, "settings", cfg.PREDICTION_SETTINGS_FN)
-    return get_settings_data(settings_path)
+def prediction_settings_path(cwd):
+    return Path(cwd.parent, "settings", cfg.PREDICTION_SETTINGS_FN)
+
+
+@pytest.fixture()
+def training_settings(training_settings_path):
+    return get_settings_data(training_settings_path)
+
+
+@pytest.fixture()
+def prediction_settings(prediction_settings_path):
+    return get_settings_data(prediction_settings_path)
 
 
 @pytest.fixture()
@@ -62,6 +69,16 @@ def rand_size():
 @pytest.fixture()
 def rand_int_volume(rand_size):
     return np.random.randint(256, size=rand_size)
+
+
+@pytest.fixture()
+def rand_label_volume(rand_size):
+    return np.random.randint(4, size=rand_size)
+
+
+@pytest.fixture()
+def rand_label_volume_no_zeros(rand_size):
+    return np.random.randint(1, 5, size=rand_size)
 
 
 @pytest.fixture()
@@ -82,14 +99,33 @@ def rand_int_hdf5_path(tmp_path, rand_int_volume, training_settings):
     output_path = tmp_path / "random_int_vol.h5"
     with h5.File(output_path, "w") as f:
         f[training_settings.data_hdf5_path] = rand_int_volume
-    return output_path
+    yield output_path
+    output_path.unlink()
+
+
+@pytest.fixture()
+def rand_label_hdf5_path(tmp_path, rand_label_volume, training_settings):
+    output_path = tmp_path / "random_label_vol.h5"
+    with h5.File(output_path, "w") as f:
+        f[training_settings.seg_hdf5_path] = rand_label_volume
+    yield output_path
+    output_path.unlink()
 
 
 @pytest.fixture()
 def rand_int_tiff_path(tmp_path, rand_int_volume):
     output_path = tmp_path / "random_int_vol.tiff"
     volwrite(output_path, rand_int_volume)
-    return output_path
+    yield output_path
+    output_path.unlink()
+
+
+@pytest.fixture()
+def rand_label_tiff_path(tmp_path, rand_label_volume):
+    output_path = tmp_path / "random_label_vol.tiff"
+    volwrite(output_path, rand_label_volume)
+    yield output_path
+    output_path.unlink()
 
 
 @pytest.fixture()

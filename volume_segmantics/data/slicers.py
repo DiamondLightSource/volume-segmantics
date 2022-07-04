@@ -49,6 +49,7 @@ class TrainingDataSlicer(BaseDataManager):
         )
         logging.info(f"These classes are: {seg_classes}")
         if seg_classes[0] != 0:
+            # TODO: Check if label classes are sequential
             logging.info("Fixing label classes.")
             self.fix_label_classes(seg_classes)
         self.codes = [f"label_val_{i}" for i in seg_classes]
@@ -111,11 +112,12 @@ class TrainingDataSlicer(BaseDataManager):
             path (str): The path of the image file including the filename prefix.
             label (bool): Whether to convert values >1 to 1 for binary segmentation.
         """
-        if label:
-            if data.dtype != np.uint8:
-                data = img_as_ubyte(data)
-            if not self.multilabel:
-                data[data > 1] = 1
+        # TODO: Allow saving a higher bit depth
+        if data.dtype != np.uint8:
+            data = img_as_ubyte(data)
+        
+        if label and not self.multilabel:
+            data[data > 1] = 1
         io.imsave(f"{path}.png", data, check_contrast=False)
 
     def delete_image_dir(self, im_dir_path):
