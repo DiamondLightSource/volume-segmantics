@@ -75,6 +75,13 @@ def rand_int_volume(rand_size):
 def rand_label_volume(rand_size):
     return np.random.randint(4, size=rand_size)
 
+@pytest.fixture()
+def rand_binary_label_volume():
+    """Binary Label volume with values [0, 255]
+    """
+    vol = np.random.randint(2, size=(27, 134, 167))
+    vol[vol == 1] = 255
+    return vol
 
 @pytest.fixture()
 def rand_label_volume_no_zeros(rand_size):
