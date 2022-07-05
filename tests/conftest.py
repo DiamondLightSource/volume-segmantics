@@ -3,10 +3,13 @@ from pathlib import Path
 import h5py as h5
 import numpy as np
 import pytest
+import torch
+import volume_segmantics.utilities.base_data_utils as utils
 import volume_segmantics.utilities.config as cfg
 from imageio import volwrite
-from skimage import img_as_ubyte, io
+from skimage import io
 from volume_segmantics.data import get_settings_data
+from volume_segmantics.model.model_2d import create_model_on_device
 
 
 def del_dir(target):
@@ -75,13 +78,14 @@ def rand_int_volume(rand_size):
 def rand_label_volume(rand_size):
     return np.random.randint(4, size=rand_size)
 
+
 @pytest.fixture()
 def rand_binary_label_volume():
-    """Binary Label volume with values [0, 255]
-    """
+    """Binary Label volume with values [0, 255]"""
     vol = np.random.randint(2, size=(27, 134, 167))
     vol[vol == 1] = 255
     return vol
+
 
 @pytest.fixture()
 def rand_label_volume_no_zeros(rand_size):
@@ -157,3 +161,32 @@ def label_dir(empty_dir):
         io.imsave(f"{path}.png", im, check_contrast=False)
     yield dir_path
     del_dir(dir_path)
+
+
+@pytest.fixture()
+def binary_model_struc_dict(training_settings):
+    model_struc_dict = training_settings.model
+    model_type = utils.get_model_type(training_settings)
+    model_struc_dict["type"] = model_type
+    model_struc_dict["in_channels"] = cfg.MODEL_INPUT_CHANNELS
+    model_struc_dict["classes"] = 2
+    return model_struc_dict
+
+
+@pytest.fixture()
+def model_path(tmp_path, training_settings):
+    model_struc_dict = training_settings.model
+    model_type = utils.get_model_type(training_settings)
+    model_struc_dict["type"] = model_type
+    model_struc_dict["in_channels"] = cfg.MODEL_INPUT_CHANNELS
+    model_struc_dict["classes"] = 2
+    model = create_model_on_device(0, model_struc_dict)
+    model_dict = {
+            "model_state_dict": model.state_dict(),
+            "model_struc_dict": model_struc_dict,
+            "label_codes": {},
+        }
+    model_save_path = tmp_path / "test_model.pytorch"
+    torch.save(model_dict, model_save_path)
+    yield model_save_path
+    model_save_path.unlink()

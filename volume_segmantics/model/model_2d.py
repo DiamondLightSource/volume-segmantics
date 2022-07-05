@@ -1,6 +1,5 @@
 import logging
 from pathlib import Path
-import sys
 from typing import Tuple
 
 import segmentation_models_pytorch as smp
