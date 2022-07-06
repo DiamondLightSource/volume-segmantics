@@ -1,7 +1,9 @@
 import pytest
-from volume_segmantics.data import get_2d_training_dataloaders
-from volume_segmantics.data.dataloaders import get_2d_prediction_dataloader
 from torch.utils.data import DataLoader
+from volume_segmantics.data.dataloaders import (
+    get_2d_prediction_dataloader,
+    get_2d_training_dataloaders,
+)
 
 
 @pytest.fixture()

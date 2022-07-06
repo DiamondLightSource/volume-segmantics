@@ -1,5 +1,4 @@
 import csv
-from distutils.command.config import config
 import logging
 import math
 import sys
@@ -17,10 +16,16 @@ import volume_segmantics.utilities.base_data_utils as utils
 import volume_segmantics.utilities.config as cfg
 from matplotlib import pyplot as plt
 from tqdm import tqdm
-from volume_segmantics.data.pytorch3dunet_losses import (BCEDiceLoss, DiceLoss,
-                                                         GeneralizedDiceLoss)
+from volume_segmantics.data.dataloaders import get_2d_training_dataloaders
+from volume_segmantics.data.pytorch3dunet_losses import (
+    BCEDiceLoss,
+    DiceLoss,
+    GeneralizedDiceLoss,
+)
 from volume_segmantics.data.pytorch3dunet_metrics import (
-    GenericAveragePrecision, MeanIoU)
+    GenericAveragePrecision,
+    MeanIoU,
+)
 from volume_segmantics.model.model_2d import create_model_on_device
 from volume_segmantics.utilities.early_stopping import EarlyStopping
 
@@ -33,9 +38,12 @@ class VolSeg2dTrainer:
         settings
     """
 
-    def __init__(self, training_loader, validation_loader, labels: Union[int, dict], settings):
-        self.training_loader = training_loader
-        self.validation_loader = validation_loader
+    def __init__(
+        self, image_dir_path, label_dir_path, labels: Union[int, dict], settings
+    ):
+        self.training_loader, self.validation_loader = get_2d_training_dataloaders(
+            image_dir_path, label_dir_path, settings
+        )
         self.label_no = labels if isinstance(labels, int) else len(labels)
         self.codes = labels if isinstance(labels, dict) else {}
         self.settings = settings
@@ -68,7 +76,9 @@ class VolSeg2dTrainer:
 
     def create_model_and_optimiser(self, learning_rate, frozen=False):
         logging.info(f"Setting up the model on device {self.settings.cuda_device}.")
-        self.model = create_model_on_device(self.model_device_num, self.model_struc_dict)
+        self.model = create_model_on_device(
+            self.model_device_num, self.model_struc_dict
+        )
         if frozen:
             self.freeze_model()
         logging.info(
@@ -224,7 +234,9 @@ class VolSeg2dTrainer:
 
             # early_stopping needs the validation loss to check if it has decreased,
             # and if it has, it will make a checkpoint of the current model
-            early_stopping(self.avg_valid_losses[-1], self.model, self.optimizer, self.codes)
+            early_stopping(
+                self.avg_valid_losses[-1], self.model, self.optimizer, self.codes
+            )
 
             if early_stopping.early_stop:
                 logging.info("Early stopping")
@@ -332,7 +344,9 @@ class VolSeg2dTrainer:
             if min_gradient < 0:
                 min_loss_grad_idx = gradients.argmin()
             else:
-                logging.info(f"Minimum gradient: {min_gradient} was positive, returning default value instead.")
+                logging.info(
+                    f"Minimum gradient: {min_gradient} was positive, returning default value instead."
+                )
                 return default_min_lr
         except Exception as e:
             logging.info(f"Failed to compute gradients, returning default value. {e}")

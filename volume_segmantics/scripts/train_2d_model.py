@@ -7,7 +7,6 @@ from pathlib import Path
 
 import volume_segmantics.utilities.config as cfg
 from volume_segmantics.data import (TrainingDataSlicer,
-                                    get_2d_training_dataloaders,
                                     get_settings_data)
 from volume_segmantics.model import VolSeg2dTrainer
 from volume_segmantics.utilities import get_2d_training_parser
@@ -46,12 +45,8 @@ def main():
             max_label_no = slicer.num_seg_classes
             label_codes = slicer.codes
     assert label_codes is not None
-    # Set up the DataLoader to load in and augment the data
-    train_loader, valid_loader = get_2d_training_dataloaders(
-        data_im_out_dir, seg_im_out_dir, settings
-    )
     # Set up the 2dTrainer
-    trainer = VolSeg2dTrainer(train_loader, valid_loader, max_label_no, settings)
+    trainer = VolSeg2dTrainer(data_im_out_dir, seg_im_out_dir, max_label_no, settings)
     # Train the model, first frozen, then unfrozen
     num_cyc_frozen = settings.num_cyc_frozen
     num_cyc_unfrozen = settings.num_cyc_unfrozen
