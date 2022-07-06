@@ -430,7 +430,8 @@ class VolSeg2dTrainer:
         plt.grid(True)
         plt.legend()
         plt.tight_layout()
-        fig_out_pth = f"{model_out_path.stem}_loss_plot.png"
+        output_dir = model_out_path.parent
+        fig_out_pth = output_dir / f"{model_out_path.stem}_loss_plot.png"
         logging.info(f"Saving figure of training/validation losses to {fig_out_pth}")
         fig.savefig(fig_out_pth, bbox_inches="tight")
         # Output a list of training stats
@@ -441,7 +442,7 @@ class VolSeg2dTrainer:
             self.avg_valid_losses,
             self.avg_eval_scores,
         )
-        with open(f"{model_out_path.stem}_train_stats.csv", "w") as f:
+        with open(output_dir / f"{model_out_path.stem}_train_stats.csv", "w") as f:
             writer = csv.writer(f)
             writer.writerow(("Epoch", "Train Loss", "Valid Loss", "Eval Score"))
             for row in rows:
