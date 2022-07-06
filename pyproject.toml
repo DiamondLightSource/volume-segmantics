@@ -38,6 +38,7 @@ testpaths = [
 ]
 markers = [
     "gpu: marks tests that require a GPU (deselect with '-m \"not gpu\"')",
+    "slow: marks tests that are particularly slow (deselect with '-m \"not slow\"')"
     ]
 filterwarnings = [
     "ignore:.*Downcasting*:UserWarning",
