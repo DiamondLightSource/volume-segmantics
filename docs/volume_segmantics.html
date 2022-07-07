@@ -68,7 +68,7 @@ volume_segmantics    </h1>
 
 <p>After installation, two new commands will be available from your terminal whilst your environment is activated, <code>model-train-2d</code> and <code>model-predict-2d</code>.</p>
 
-<p>These commands require access to some settings stored in YAML files. These need to be located in a directory named <code>volseg-settings</code> within the directory where you are running the commands. The settings files can be copied from <a href="https://gitlab.diamond.ac.uk/data-analysis/imaging/unet-segmentation/-/tree/packaging/settings">here</a>. </p>
+<p>These commands require access to some settings stored in YAML files. These need to be located in a directory named <code>volseg-settings</code> within the directory where you are running the commands. The settings files can be copied from <a href="https://github.com/DiamondLightSource/volume-segmantics/tree/main/settings">here</a>. </p>
 
 <p>The file <code>2d_model_train_settings.yaml</code> can be edited in order to change training parameters such as number of epochs, loss functions, evaluation metrics and also model and encoder architectures. The file <code>2d_model_predict_settings.yaml</code> can be edited to change parameters such as the prediction "quality" e.g "low" quality refers to prediction of the volume segmentation by taking images along a single axis (images in the (x,y) plane). For "medium" and "high" quality, predictions are done along 3 axes and in 12 directions (3 axes, 4 rotations) respectively, before being combined by maximum probability. </p>
 
@@ -79,7 +79,7 @@ volume_segmantics    </h1>
 <div class="pdoc-code codehilite"><pre><span></span><code>model-train-2d --data path/to/image/data.h5 --labels path/to/corresponding/segmentation/labels.h5
 </code></pre></div>
 
-<p>A model will be trained according to the settings defined in <code>/volseg-settings/2d_model_train_settings.yaml</code> and saved to your working directory. In addition, a figure showing "ground truth" segmentation vs model segmentation for some images in the validation set will be saved. </p>
+<p>Paths to multiple data and label volumes can be added after the <code>--data</code> and <code>--labels</code> flags respectively. A model will be trained according to the settings defined in <code>/volseg-settings/2d_model_train_settings.yaml</code> and saved to your working directory. In addition, a figure showing "ground truth" segmentation vs model segmentation for some images in the validation set will be saved. </p>
 
 <h5 id="for-3d-volume-segmentation-prediction-using-a-2d-model">For 3d volume segmentation prediction using a 2d model</h5>
 
