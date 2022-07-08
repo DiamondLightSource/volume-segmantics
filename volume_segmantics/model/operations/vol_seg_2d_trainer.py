@@ -275,7 +275,7 @@ class VolSeg2dTrainer:
         logging.info(f"LR to use {lr_to_use}")
         return lr_to_use
 
-    def lr_finder(self, lr_scheduler, smoothing=0.05, plt_fig=True):
+    def lr_finder(self, lr_scheduler, smoothing=0.05):
         lr_find_loss = []
         lr_find_lr = []
         iters = 0
@@ -303,7 +303,7 @@ class VolSeg2dTrainer:
                     break
                 iters += 1
 
-        if plt_fig:
+        if self.settings.plot_lr_graph:
             fig = tpl.figure()
             fig.plot(
                 np.log10(lr_find_lr),

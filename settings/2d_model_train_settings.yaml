@@ -26,6 +26,7 @@ starting_lr: 1e-6 # Lower bound of learning rate search
 end_lr: 50 # Upper Bound of learning rate search
 lr_find_epochs: 1 # Number of training epochs for learning rate search
 lr_reduce_factor: 500 # Divisor for start and end LR when finding LR on reloaded model
+plot_lr_graph: False # Set to True if gnuplot is installed and a terminal plot of learning rate is required 
 
 # Parameters to control model architecture
 model:
