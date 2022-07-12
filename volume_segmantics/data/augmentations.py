@@ -1,12 +1,24 @@
+"""
+Provides functions to enable image augmentations for training and prediction.
+"""
+
 import math
 
 import albumentations as A
-import volume_segmantics.utilities.config as cfg
 from albumentations.pytorch.transforms import ToTensorV2
+import volume_segmantics.utilities.config as cfg
 
 
 def get_train_preprocess_augs(img_size: int) -> A.core.composition.Compose:
+    """Returns the augmentations required to pad images to the correct square size
+    for training a network.
 
+    Args:
+        img_size (int): Length of square image edge.
+
+    Returns:
+        A.core.composition.Compose: An augmentation to resize the image if needed.
+    """
     return A.Compose(
         [
             A.LongestMaxSize(max_size=img_size, p=1.0),
@@ -15,7 +27,16 @@ def get_train_preprocess_augs(img_size: int) -> A.core.composition.Compose:
     )
 
 
-def get_padded_dimension(dimension):
+def get_padded_dimension(dimension: int) -> int:
+    """Returns the closest image dimension that can be divided by the divisor
+    specified in the config.
+
+    Args:
+        dimension (int): input dimension.
+
+    Returns:
+        int: Dimension that can divided by divisor
+    """
     image_divisor = cfg.IM_SIZE_DIVISOR
     if dimension % image_divisor == 0:
         return dimension
@@ -25,7 +46,16 @@ def get_padded_dimension(dimension):
 def get_pred_preprocess_augs(
     img_size_y: int, img_size_x: int
 ) -> A.core.composition.Compose:
+    """Returns the augmentations required to pad images to the correct size for
+    prediction
 
+    Args:
+        img_size_y (int): Image size in y
+        img_size_x (int): Image size in x
+
+    Returns:
+        A.core.composition.Compose: An augmentation to resize the image if needed.
+    """
     padded_y_dim = get_padded_dimension(img_size_y)
     padded_x_dim = get_padded_dimension(img_size_x)
     return A.Compose(
@@ -36,7 +66,14 @@ def get_pred_preprocess_augs(
 
 
 def get_train_augs(img_size: int) -> A.core.composition.Compose:
+    """Returns the augmentations used for training a network.
 
+    Args:
+        img_size (int): The square image size required.
+
+    Returns:
+        A.core.composition.Compose: Augmentations for training.
+    """
     return A.Compose(
         [
             A.RandomSizedCrop(
@@ -65,5 +102,9 @@ def get_train_augs(img_size: int) -> A.core.composition.Compose:
 
 
 def get_postprocess_augs() -> A.core.composition.Compose:
+    """Returns the final augmentations applied to the images.
 
+    Returns:
+        A.core.composition.Compose: Postprocessing augmentations.
+    """
     return A.Compose([ToTensorV2()])
