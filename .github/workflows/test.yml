@@ -1,9 +1,6 @@
 name: test
 
-on: pull_request
-	  push
-	  workflow_dispatch
-
+on: [pull_request, push, workflow_dispatch]
 jobs:
   test-windows:
     strategy:
@@ -38,4 +35,3 @@ jobs:
       - run: |
           source $VENV
           pytest --version
-          
