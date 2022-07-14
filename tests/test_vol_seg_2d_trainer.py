@@ -17,6 +17,7 @@ def find_frozen_params(model):
 
 
 class TestVolSeg2dTrainer:
+    @pytest.mark.gpu
     def test_2d_trainer_init(self, volseg_2d_trainer):
         assert isinstance(volseg_2d_trainer, VolSeg2dTrainer)
         assert volseg_2d_trainer.label_no == 4
@@ -42,6 +43,7 @@ class TestVolSeg2dTrainer:
         param_list = find_frozen_params(volseg_2d_trainer.model)
         assert len(param_list) == 0
 
+    @pytest.mark.gpu
     @pytest.mark.parametrize(
         "loss_name",
         [
@@ -57,6 +59,7 @@ class TestVolSeg2dTrainer:
         criterion = volseg_2d_trainer.get_loss_criterion()
         assert isinstance(criterion, torch.nn.Module)
 
+    @pytest.mark.gpu
     def test_get_loss_criterion_bad_loss(
         self, volseg_2d_trainer, loss_name="lossnessmonster"
     ):
@@ -66,6 +69,7 @@ class TestVolSeg2dTrainer:
         assert wrapped_e.type == SystemExit
         assert wrapped_e.value.code == 1
 
+    @pytest.mark.gpu
     @pytest.mark.parametrize(
         "eval_metric_name",
         [
@@ -78,6 +82,7 @@ class TestVolSeg2dTrainer:
         metric = volseg_2d_trainer.get_eval_metric()
         assert hasattr(metric, "__dict__")
 
+    @pytest.mark.gpu
     def test_get_eval_metric_bad_metric(
         self, volseg_2d_trainer, eval_metric_name="evaluatethis"
     ):

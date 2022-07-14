@@ -29,6 +29,7 @@ def test_create_model_on_device(binary_model_struc_dict, model_type):
     assert device.index == 0
 
 
+@pytest.mark.gpu
 def test_create_model_from_file(model_path):
     model, classes, codes = create_model_from_file(model_path)
     assert isinstance(model, torch.nn.Module)
