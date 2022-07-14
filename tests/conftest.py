@@ -66,7 +66,7 @@ def prediction_settings(prediction_settings_path):
 
 @pytest.fixture()
 def rand_size():
-    return np.random.randint(2, 256, size=(3))
+    return np.random.randint(3, 256, size=(3))
 
 
 @pytest.fixture()

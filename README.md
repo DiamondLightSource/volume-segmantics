@@ -2,13 +2,19 @@
 
 A toolkit for semantic segmentation of volumetric data using PyTorch deep learning models.
 
+![example workflow](https://github.com/DiamondLightSource/volume-segmantics/actions/workflows/tests.yml/badge.svg)
+
 Given a 3d image volume and corresponding dense labels (the segmentation), a 2d model is trained on image slices taken along the x, y, and z axes. The method is optimised for small training datasets, e.g a single $384^3$ pixel dataset. To achieve this, all models use pretrained encoders and image augmentations are used to expand the size of the training dataset.
 
 This work utilises the abilities afforded by the excellent [segmentation-models-pytorch](https://github.com/qubvel/segmentation_models.pytorch) library. Also the metrics and loss functions used make use of the hard work done by Adrian Wolny in his [pytorch-3dunet](https://github.com/wolny/pytorch-3dunet) repository. 
 
+## Requirements
+
+A machine capable of running CUDA enabled PyTorch version 1.7.1 or greater is required. This generally means a reasonably modern NVIDIA GPU. The exact requirements differ according to operating system. For example on Windows you will need Visual Studio Build Tools as well as CUDA Toolkit installed see [the CUDA docs](https://docs.nvidia.com/cuda/cuda-installation-guide-microsoft-windows/index.html) for more details. 
+
 ## Installation
 
-At present, the easiest way to install is to create a new conda enviroment or virtualenv with python (ideally >= version 3.8) and pip, activate the envionment and `pip install volume-segmantics`.
+The easiest way to install the package is to first create a new conda environment or virtualenv with python (ideally >= version 3.8) and also pip, then activate the environment and `pip install volume-segmantics`. If a CUDA-enabled build of PyTorch is not being installed by pip, you can try `pip install volume-segmantics --extra-index-url https://download.pytorch.org/whl` this particularity seems to be an issue on Windows. 
 
 ## Configuration and command line use
 
@@ -19,7 +25,7 @@ These commands require access to some settings stored in YAML files. These need 
 The file `2d_model_train_settings.yaml` can be edited in order to change training parameters such as number of epochs, loss functions, evaluation metrics and also model and encoder architectures. The file `2d_model_predict_settings.yaml` can be edited to change parameters such as the prediction "quality" e.g "low" quality refers to prediction of the volume segmentation by taking images along a single axis (images in the (x,y) plane). For "medium" and "high" quality, predictions are done along 3 axes and in 12 directions (3 axes, 4 rotations) respectively, before being combined by maximum probability. 
 
 ### For training a 2d model on a 3d image volume and corresponding labels
-Run the following command. Input files can be in HDF5 or multipage TIFF format.
+Run the following command. Input files can be in HDF5 or multi-page TIFF format.
 
 ```shell
 model-train-2d --data path/to/image/data.h5 --labels path/to/corresponding/segmentation/labels.h5
@@ -28,7 +34,7 @@ model-train-2d --data path/to/image/data.h5 --labels path/to/corresponding/segme
 Paths to multiple data and label volumes can be added after the `--data` and `--labels` flags respectively. A model will be trained according to the settings defined in `/volseg-settings/2d_model_train_settings.yaml` and saved to your working directory. In addition, a figure showing "ground truth" segmentation vs model segmentation for some images in the validation set will be saved. 
 
 ##### For 3d volume segmentation prediction using a 2d model
-Run the following command. Input image files can be in HDF5 or multipage TIFF format.
+Run the following command. Input image files can be in HDF5 or multi-page TIFF format.
 
 ```shell
 model-predict-2d path/to/model_file.pytorch path/to/data_for_prediction.h5
