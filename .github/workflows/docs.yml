@@ -40,7 +40,9 @@ jobs:
         run: poetry install --no-interaction
       # ADJUST THIS: build your documentation into docs/.
       - name: Run pdoc
-        run: pdoc --docformat google volume_segmantics/ -o docs/
+        run: |
+          source $VENV
+          pdoc --docformat google volume_segmantics/ -o docs/
       # We use a custom build script for pdoc itself, ideally you just run `pdoc -o docs/ ...` here.
 
       - run: tar --directory docs/ -hcf artifact.tar .
