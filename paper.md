@@ -37,7 +37,7 @@ Imaging (MRI), Electron Tomography (ET)). Although the idea of semantic
 segmentation is a relatively simple one, giving each pixel a label that defines 
 what it represents (e.g cranial bone versus brain tissue), due to the subjective 
 and laborious nature of the manual labelling task coupled with the huge size of the 
-data (multi GB files containing billions of pixels) this process is a bottleneck 
+data (multi-GB files containing billions of pixels) this process is a bottleneck 
 in imaging workflows. In recent years, deep learning has brought models capable of 
 fast and accurate interpretation of image data into the toolbox available to 
 scientists. These models are often trained on large image datasets that have been 
@@ -50,7 +50,7 @@ package that provides a command line interface (CLI) as well as an Application
 Programming Interface (API) for training 2-dimensional (2D)
 PyTorch deep learning models on small amounts of annotated 3D image 
 data.  The package also enables applying these models to new (often much larger) 
-3D datasets in order to speed up the process of semantic segmentation.
+3D datasets to speed up the process of semantic segmentation.
 
 
 # Statement of need
@@ -73,19 +73,19 @@ resources than their 3D counterparts (ref gas hydrates benchmarking), when
 predicting a segmentation for a volume, the lack of 2D context available to these 
 models can lead to striping artifacts in the 3D output, especially when viewed 
 in planes other than the one used for prediction. To overcome this, a multi-axis 
-prediction method is used and the multiple predictions are merged by using 
+prediction method is used, and the multiple predictions are merged by using 
 maximum probability voting. It is hoped that in the future other merging techniques 
 will be included such as those in (ref).
 
 During development of `Volume Segmantics` pre-trained U-Net models have been 
-given additional fine-turning on small amounts of annotated data in order to 
+given additional fine-tuning on small amounts of annotated data in order to 
 investigate the structures that interface maternal and fetal blood volumes in 
 human placental tissue (ref). In this study, expert annotation of volumes of 
 size $256^3$ and $384^3$ were sufficient to create two models that gave accurate 
 segmentation of two much larger synchrotron X-ray CT (SXCT) datasets 
 $(2520 \times 2520 \times 2120 px)$. In a completely different context, SXCT 
 datasets collected on a soil system in which methane bubbles were forming in 
-a system containing sand and brine were used in order to study the utility of
+a system containing sand and brine were used to study the utility of
 a 2D U-Net in comparison to its 3D counterpart (ref Gas hydrates). Here, the 
 training data ranged in size from $384^3$ pixels to $572^3$. As well as requiring 
 less time to train than a 3D U-Net, the pre-trained 2D network provided more 
