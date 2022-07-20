@@ -1,16 +1,18 @@
 name: Build and Release
 on:
   push:
-    branches:
-      - main
     tags:
       - "v*.*.*"
+  workflow_dispatch:
 jobs:
   build:
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v3
       - name: Build and publish to pypi
         uses: JRubics/poetry-publish@v1.12
         with:
+          python_version: "3.9.13"
           pypi_token: ${{ secrets.PYPI_TOKEN }}
+          ignore_dev_requirements: "yes"
