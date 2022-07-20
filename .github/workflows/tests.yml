@@ -1,6 +1,11 @@
-name: test
+name: tests
 
-on: [pull_request, push, workflow_dispatch]
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 5 * * 1'
 jobs:
   tests-multiple-os:
     strategy:
