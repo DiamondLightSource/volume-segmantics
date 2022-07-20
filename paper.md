@@ -32,7 +32,7 @@ bibliography: paper.bib
 
 Segmentation of volumetric (3-dimensional (3D)) images is a widely used technique 
 that allows interpretation and quantification of experimental data collected 
-using a number of techniques (e.g. Computed Tomography (CT), Magnetic Resonance 
+using a number of techniques (for example, Computed Tomography (CT), Magnetic Resonance 
 Imaging (MRI), Electron Tomography (ET)). Although the idea of semantic 
 segmentation is a relatively simple one, giving each pixel a label that defines 
 what it represents (e.g cranial bone versus brain tissue), due to the subjective 
@@ -55,9 +55,9 @@ data.  The package also enables applying these models to new (often much larger)
 
 # Statement of need
 
-`Volume Segmantics` harnesses the availability of 2-dimensional  
+`Volume Segmantics` harnesses the availability of 2-dimensional 
 encoders which have been pre-trained on huge databases such as ImageNet (ref1). 
-This provides two main advantages, namely (i) it to reduces the time and 
+This provides two main advantages, namely (i) it reduces the time and 
 resource taken to train models - only fine-tuning is required and (ii) it prevents
 over-fitting the models when training on small datasets. These models of various 
 architectures are included from the (segmentation models pytorch ref) repository.
