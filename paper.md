@@ -56,54 +56,60 @@ data.  The package also enables applying these models to new (often much larger)
 # Statement of need
 
 `Volume Segmantics` harnesses the availability of 2-dimensional 
-encoders which have been pre-trained on huge databases such as ImageNet (ref1). 
-This provides two main advantages, namely (i) it reduces the time and 
-resource taken to train models - only fine-tuning is required and (ii) it prevents
-over-fitting the models when training on small datasets. These models of various 
-architectures are included from the (segmentation models pytorch ref) repository.
+encoders which have been pre-trained on huge databases such as ImageNet 
+[@russakovsky_imagenet_2015]. This provides two main advantages, namely (i) 
+it reduces the time and resource taken to train models - only fine-tuning is 
+required and (ii) it prevents over-fitting the models when training on small 
+datasets. These models of various architectures are included from the 
+`segmentation-models-pytorch` repository [@Yakubovskiy:2019].
 In order to increase the accuracy of the models, augmentations of the data are
 made during training, both via 'slicing' the 3D data in planes perpendicular to 
 the three orthogonal axes $((x, y), (x, z), (y, z))$ and by using the library 
-Albumentations (insert ref). Additionally, user configuration for training is 
-kept to a minimum by starting with a reliable default set of parameters and by 
-automatically choosing the model learning rate.
+`Albumentations` [@buslaev_albumentations_2020]. Additionally, user configuration 
+for training is kept to a minimum by starting with a reliable default set of 
+parameters and by automatically choosing the model learning rate. If adjustments 
+to model architecture, encoder type, loss function or training epochs are required, 
+these can be made by editing a YAML file.
 
 Even though these 2D models are quicker to train and require fewer computational 
-resources than their 3D counterparts (ref gas hydrates benchmarking), when 
+resources than their 3D counterparts [@alvarez-borges_u-net_2021], when 
 predicting a segmentation for a volume, the lack of 2D context available to these 
 models can lead to striping artifacts in the 3D output, especially when viewed 
 in planes other than the one used for prediction. To overcome this, a multi-axis 
 prediction method is used, and the multiple predictions are merged by using 
 maximum probability voting. It is hoped that in the future other merging techniques 
-will be included such as those in (ref).
+will be included such as fusion models [@perslev_one_2019].
 
 During development of `Volume Segmantics` pre-trained U-Net models have been 
 given additional fine-tuning on small amounts of annotated data in order to 
 investigate the structures that interface maternal and fetal blood volumes in 
-human placental tissue (ref). In this study, expert annotation of volumes of 
-size $256^3$ and $384^3$ were sufficient to create two models that gave accurate 
-segmentation of two much larger synchrotron X-ray CT (SXCT) datasets 
-$(2520 \times 2520 \times 2120 px)$. In a completely different context, SXCT 
-datasets collected on a soil system in which methane bubbles were forming in 
-a system containing sand and brine were used to study the utility of
-a 2D U-Net in comparison to its 3D counterpart (ref Gas hydrates). Here, the 
-training data ranged in size from $384^3$ pixels to $572^3$. As well as requiring 
-less time to train than a 3D U-Net, the pre-trained 2D network provided more 
-accurate segmentation results. 
+human placental tissue [@tun_massively_2021]. In this study, expert annotation of 
+volumes of size $256^3$ and $384^3$ were sufficient to create two models that gave 
+accurate segmentation of two much larger synchrotron X-ray CT (SXCT) datasets 
+$(2520 \times 2520 \times 2120 pixels)$. In a completely different context, SXCT 
+datasets were collected on a soil system in which methane bubbles were forming in 
+brine amongst sand particles. The utility of a pre-trained 2D U-Net was investigated 
+to segment these variable-contrast image volumes in comparison with a 3D U-Net with 
+no prior training [@alvarez-borges_u-net_2021]. In this case, the training data 
+ranged in size from $384^3$ pixels to $572^3$. As well as requiring less time to 
+train than a 3D U-Net, the pre-trained 2D network provided more accurate segmentation 
+results. 
 
 The API provided with the package allows segmentation models to be trained and 
 used in other contexts. For example, `Volume Segmantics` is currently being 
-integrated into `SuRVoS2`, a client-server application with a GUI for annotating 
-volumetric data in order to train machine learning models via a series of 'scribbles' 
-applied to the data. It is hoped that scientists using our synchrotron facility 
-will be able to easily train and use their own deep learning 
-models to perform segmentation during their time here and when back at their own 
-institutions and that other scientists will use and extend the package for their 
-own purposes. 
+integrated into `SuRVoS2` [@pennington_survos_2022], a client-server application with 
+a GUI for annotating volumetric data. In order to generate machine learning models 3D 
+'scribbles' are drawn on the data to provide training annotation. 
+It is hoped that scientists using our synchrotron facility will be able to train 
+and use their own deep learning models using this interface to the library. These 
+models can then be used to segment data during their time here and also when back at 
+their home institution. It is also hoped that the scientific community will use and 
+extend `Volume Segmantics` for their own purposes. 
 
 # Acknowledgements
 
-We would like to acknowledge helpful discussions with Avery Pennington, Luis Perdigao 
-and Michele Darrow during the development of this project.
+We would like to acknowledge helpful discussions with Avery Pennington, Sharif Ahmed, 
+Fernando Alvarez-Borges, Luis Perdigao and Michele Darrow during the development of 
+this project.
 
 # References
