@@ -46,12 +46,12 @@ def cwd():
 
 @pytest.fixture()
 def training_settings_path(cwd):
-    return Path(cwd.parent, "settings", cfg.TRAIN_SETTINGS_FN)
+    return Path(cwd.parent, "volseg-settings", cfg.TRAIN_SETTINGS_FN)
 
 
 @pytest.fixture()
 def prediction_settings_path(cwd):
-    return Path(cwd.parent, "settings", cfg.PREDICTION_SETTINGS_FN)
+    return Path(cwd.parent, "volseg-settings", cfg.PREDICTION_SETTINGS_FN)
 
 
 @pytest.fixture()
