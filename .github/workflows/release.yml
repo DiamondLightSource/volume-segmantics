@@ -1,13 +1,11 @@
 name: Build and Release
 on:
-  push:
-    tags:
-      - "v*.*.*"
+  release:
+    types: [published]
   workflow_dispatch:
 jobs:
   build:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v3
       - name: Build and publish to pypi
@@ -16,3 +14,20 @@ jobs:
           python_version: "3.9.13"
           pypi_token: ${{ secrets.PYPI_TOKEN }}
           ignore_dev_requirements: "yes"
+  zip-settings:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: vimtor/action-zip@v1
+        with:
+          files: volseg-settings
+          dest: volseg-settings.zip
+      - uses: actions/upload-artifact@v1
+        with:
+          name: volseg-settings
+          path: ${{ github.workspace }}/volseg-settings.zip
+      - name: Add settings to release
+        uses: djn24/add-asset-to-release@v1
+        with:
+          token: ${{secrets.GITHUB_TOKEN}}
+          path: ${{ github.workspace }}/volseg-settings.zip
