@@ -1,5 +1,5 @@
 ---
-title: 'Volume Segmantics: A Python package for semantic segmentation of volumetric data using pre-trained PyTorch deep learning models'
+title: 'Volume Segmantics: A Python Package for Semantic Segmentation of Volumetric Data Using Pre-trained PyTorch Deep Learning Models'
 tags:
   - Python
   - segmentation
