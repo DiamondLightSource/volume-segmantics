@@ -30,7 +30,7 @@ bibliography: paper.bib
 
 # Summary
 
-Segmentation of volumetric (3-dimensional (3D)) images is a widely used technique 
+Segmentation of 3-dimensional (3D, volumetric) images is a widely used technique 
 that allows interpretation and quantification of experimental data collected 
 using a number of techniques (for example, Computed Tomography (CT), Magnetic Resonance 
 Imaging (MRI), Electron Tomography (ET)). Although the idea of semantic 
