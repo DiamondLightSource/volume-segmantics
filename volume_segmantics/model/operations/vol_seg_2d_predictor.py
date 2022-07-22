@@ -25,10 +25,10 @@ class VolSeg2dPredictor:
         )
         self.model, self.num_labels, self.label_codes = model_tuple
 
-    def get_model_from_trainer(self, trainer):
+    def _get_model_from_trainer(self, trainer):
         self.model = trainer.model
 
-    def predict_single_axis(self, data_vol, output_probs=False, axis=Axis.Z):
+    def _predict_single_axis(self, data_vol, output_probs=False, axis=Axis.Z):
         output_vol_list = []
         output_prob_list = []
         data_vol = utils.rotate_array_to_axis(data_vol, axis)
@@ -64,30 +64,30 @@ class VolSeg2dPredictor:
             probs = utils.rotate_array_to_axis(probs, axis)
         return labels, probs
 
-    def predict_3_ways_max_probs(self, data_vol):
+    def _predict_3_ways_max_probs(self, data_vol):
         shape_tup = data_vol.shape
         logging.info("Creating empty data volumes in RAM to combine 3 axis prediction.")
         label_container = np.empty((2, *shape_tup), dtype=np.uint8)
         prob_container = np.empty((2, *shape_tup), dtype=np.float16)
         logging.info("Predicting YX slices:")
-        label_container[0], prob_container[0] = self.predict_single_axis(
+        label_container[0], prob_container[0] = self._predict_single_axis(
             data_vol, output_probs=True
         )
         logging.info("Predicting ZX slices:")
-        label_container[1], prob_container[1] = self.predict_single_axis(
+        label_container[1], prob_container[1] = self._predict_single_axis(
             data_vol, output_probs=True, axis=Axis.Y
         )
         logging.info("Merging XY and ZX volumes.")
-        self.merge_vols_in_mem(prob_container, label_container)
+        self._merge_vols_in_mem(prob_container, label_container)
         logging.info("Predicting ZY slices:")
-        label_container[1], prob_container[1] = self.predict_single_axis(
+        label_container[1], prob_container[1] = self._predict_single_axis(
             data_vol, output_probs=True, axis=Axis.X
         )
         logging.info("Merging max of XY and ZX volumes with ZY volume.")
-        self.merge_vols_in_mem(prob_container, label_container)
+        self._merge_vols_in_mem(prob_container, label_container)
         return label_container[0], prob_container[0]
 
-    def merge_vols_in_mem(self, prob_container, label_container):
+    def _merge_vols_in_mem(self, prob_container, label_container):
         max_prob_idx = np.argmax(prob_container, axis=0)
         max_prob_idx = max_prob_idx[np.newaxis, :, :, :]
         prob_container[0] = np.squeeze(
@@ -97,40 +97,40 @@ class VolSeg2dPredictor:
             np.take_along_axis(label_container, max_prob_idx, axis=0)
         )
 
-    def predict_12_ways_max_probs(self, data_vol):
+    def _predict_12_ways_max_probs(self, data_vol):
         shape_tup = data_vol.shape
         logging.info("Creating empty data volumes in RAM to combine 12 way prediction.")
         label_container = np.empty((2, *shape_tup), dtype=np.uint8)
         prob_container = np.empty((2, *shape_tup), dtype=np.float16)
-        label_container[0], prob_container[0] = self.predict_3_ways_max_probs(data_vol)
+        label_container[0], prob_container[0] = self._predict_3_ways_max_probs(data_vol)
         for k in range(1, 4):
             logging.info(f"Rotating volume {k * 90} degrees")
             data_vol = np.rot90(data_vol)
-            labels, probs = self.predict_3_ways_max_probs(data_vol)
+            labels, probs = self._predict_3_ways_max_probs(data_vol)
             label_container[1] = np.rot90(labels, -k)
             prob_container[1] = np.rot90(probs, -k)
             logging.info(
                 f"Merging rot {k * 90} deg volume with rot {(k-1) * 90} deg volume."
             )
-            self.merge_vols_in_mem(prob_container, label_container)
+            self._merge_vols_in_mem(prob_container, label_container)
         return label_container[0], prob_container[0]
 
-    def predict_single_axis_to_one_hot(self, data_vol, axis=Axis.Z):
-        prediction, _ = self.predict_single_axis(data_vol, axis=axis)
+    def _predict_single_axis_to_one_hot(self, data_vol, axis=Axis.Z):
+        prediction, _ = self._predict_single_axis(data_vol, axis=axis)
         return utils.one_hot_encode_array(prediction, self.num_labels)
 
-    def predict_3_ways_one_hot(self, data_vol):
-        one_hot_out = self.predict_single_axis_to_one_hot(data_vol)
-        one_hot_out += self.predict_single_axis_to_one_hot(data_vol, Axis.Y)
-        one_hot_out += self.predict_single_axis_to_one_hot(data_vol, Axis.X)
+    def _predict_3_ways_one_hot(self, data_vol):
+        one_hot_out = self._predict_single_axis_to_one_hot(data_vol)
+        one_hot_out += self._predict_single_axis_to_one_hot(data_vol, Axis.Y)
+        one_hot_out += self._predict_single_axis_to_one_hot(data_vol, Axis.X)
         return one_hot_out
 
-    def predict_12_ways_one_hot(self, data_vol):
-        one_hot_out = self.predict_3_ways_one_hot(data_vol)
+    def _predict_12_ways_one_hot(self, data_vol):
+        one_hot_out = self._predict_3_ways_one_hot(data_vol)
         for k in range(1, 4):
             logging.info(f"Rotating volume {k * 90} degrees")
             data_vol = np.rot90(data_vol)
             one_hot_out += np.rot90(
-                self.predict_3_ways_one_hot(data_vol), -k, axes=(-3, -2)
+                self._predict_3_ways_one_hot(data_vol), -k, axes=(-3, -2)
             )
         return one_hot_out

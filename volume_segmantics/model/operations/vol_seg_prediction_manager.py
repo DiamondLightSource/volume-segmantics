@@ -29,23 +29,23 @@ class VolSeg2DPredictionManager(BaseDataManager):
             quality = utils.get_prediction_quality(self.settings)
         if quality == utils.Quality.LOW:
             if one_hot:
-                prediction = self.predictor.predict_single_axis_to_one_hot(
+                prediction = self.predictor._predict_single_axis_to_one_hot(
                     self.data_vol
                 )
             else:
-                prediction, probs = self.predictor.predict_single_axis(self.data_vol)
+                prediction, probs = self.predictor._predict_single_axis(self.data_vol)
         if quality == utils.Quality.MEDIUM:
             if one_hot:
-                prediction = self.predictor.predict_3_ways_one_hot(self.data_vol)
+                prediction = self.predictor._predict_3_ways_one_hot(self.data_vol)
             else:
-                prediction, probs = self.predictor.predict_3_ways_max_probs(
+                prediction, probs = self.predictor._predict_3_ways_max_probs(
                     self.data_vol
                 )
         if quality == utils.Quality.HIGH:
             if one_hot:
-                prediction = self.predictor.predict_12_ways_one_hot(self.data_vol)
+                prediction = self.predictor._predict_12_ways_one_hot(self.data_vol)
             else:
-                prediction, probs = self.predictor.predict_12_ways_max_probs(
+                prediction, probs = self.predictor._predict_12_ways_max_probs(
                     self.data_vol
                 )
         if output_path is not None:
