@@ -24,9 +24,9 @@ class BaseDataManager:
         elif isinstance(data_vol, np.ndarray):
             self.data_vol = data_vol
             self.input_data_chunking = True
-        self.preprocess_data()
+        self._preprocess_data()
 
-    def preprocess_data(self):
+    def _preprocess_data(self):
         if self.downsample:
             self.data_vol = utils.downsample_data(self.data_vol)
         self.data_vol_shape = self.data_vol.shape

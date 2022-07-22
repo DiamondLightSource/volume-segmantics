@@ -37,9 +37,9 @@ class TrainingDataSlicer(BaseDataManager):
             )
         elif isinstance(label_vol, np.ndarray):
             self.seg_vol = label_vol
-        self.preprocess_labels()
+        self._preprocess_labels()
 
-    def preprocess_labels(self):
+    def _preprocess_labels(self):
         seg_classes = np.unique(self.seg_vol)
         self.num_seg_classes = len(seg_classes)
         if self.num_seg_classes > 2:
@@ -50,10 +50,10 @@ class TrainingDataSlicer(BaseDataManager):
         logging.info(f"These classes are: {seg_classes}")
         if seg_classes[0] != 0 or not utils.sequential_labels(seg_classes):
             logging.info("Fixing label classes.")
-            self.fix_label_classes(seg_classes)
+            self._fix_label_classes(seg_classes)
         self.codes = [f"label_val_{i}" for i in seg_classes]
 
-    def fix_label_classes(self, seg_classes):
+    def _fix_label_classes(self, seg_classes):
         """Changes the data values of classes in a segmented volume so that
         they start from zero.
 
@@ -72,7 +72,7 @@ class TrainingDataSlicer(BaseDataManager):
         self.data_im_out_dir = data_dir
         logging.info("Slicing data volume and saving slices to disk")
         os.makedirs(data_dir, exist_ok=True)
-        self.output_slices_to_disk(self.data_vol, data_dir, prefix)
+        self._output_slices_to_disk(self.data_vol, data_dir, prefix)
 
     def output_label_slices(self, data_dir, prefix):
         """Wrapper method to intitiate slicing label volume to disk.
@@ -83,9 +83,9 @@ class TrainingDataSlicer(BaseDataManager):
         self.seg_im_out_dir = data_dir
         logging.info("Slicing label volume and saving slices to disk")
         os.makedirs(data_dir, exist_ok=True)
-        self.output_slices_to_disk(self.seg_vol, data_dir, prefix, label=True)
+        self._output_slices_to_disk(self.seg_vol, data_dir, prefix, label=True)
 
-    def output_slices_to_disk(self, data_arr, output_path, name_prefix, label=False):
+    def _output_slices_to_disk(self, data_arr, output_path, name_prefix, label=False):
         """Coordinates the slicing of an image volume in the three orthogonal
         planes to images on disk.
 
@@ -99,11 +99,11 @@ class TrainingDataSlicer(BaseDataManager):
         num_ims = utils.get_num_of_ims(shape_tup)
         for axis, index in tqdm(ax_idx_pairs, total=num_ims):
             out_path = output_path / f"{name_prefix}_{axis}_stack_{index}"
-            self.output_im(
+            self._output_im(
                 utils.axis_index_to_slice(data_arr, axis, index), out_path, label
             )
 
-    def output_im(self, data, path, label=False):
+    def _output_im(self, data, path, label=False):
         """Converts a slice of data into an image on disk.
 
         Args:
@@ -119,7 +119,7 @@ class TrainingDataSlicer(BaseDataManager):
             data[data > 1] = 1
         io.imsave(f"{path}.png", data, check_contrast=False)
 
-    def delete_image_dir(self, im_dir_path):
+    def _delete_image_dir(self, im_dir_path):
         if im_dir_path.exists():
             ims = list(im_dir_path.glob("*.png"))
             logging.info(f"Deleting {len(ims)} images.")
@@ -130,5 +130,5 @@ class TrainingDataSlicer(BaseDataManager):
 
     def clean_up_slices(self):
         """Wrapper function that cleans up data and label image slices."""
-        self.delete_image_dir(self.data_im_out_dir)
-        self.delete_image_dir(self.seg_im_out_dir)
+        self._delete_image_dir(self.data_im_out_dir)
+        self._delete_image_dir(self.seg_im_out_dir)

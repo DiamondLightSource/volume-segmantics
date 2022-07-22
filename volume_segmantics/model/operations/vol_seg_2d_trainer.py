@@ -50,20 +50,20 @@ class VolSeg2dTrainer:
         # Params for learning rate finder
         self.starting_lr = float(settings.starting_lr)
         self.end_lr = float(settings.end_lr)
-        self.log_lr_ratio = self.calculate_log_lr_ratio()
+        self.log_lr_ratio = self._calculate_log_lr_ratio()
         self.lr_find_epochs = settings.lr_find_epochs
         self.lr_reduce_factor = settings.lr_reduce_factor
         # Params for model training
         self.model_device_num = int(settings.cuda_device)
         self.patience = settings.patience
-        self.loss_criterion = self.get_loss_criterion()
-        self.eval_metric = self.get_eval_metric()
-        self.model_struc_dict = self.get_model_struc_dict(settings)
+        self.loss_criterion = self._get_loss_criterion()
+        self.eval_metric = self._get_eval_metric()
+        self.model_struc_dict = self._get_model_struc_dict(settings)
         self.avg_train_losses = []  # per epoch training loss
         self.avg_valid_losses = []  #  per epoch validation loss
         self.avg_eval_scores = []  #  per epoch evaluation score
 
-    def get_model_struc_dict(self, settings):
+    def _get_model_struc_dict(self, settings):
         model_struc_dict = settings.model
         model_type = utils.get_model_type(settings)
         model_struc_dict["type"] = model_type
@@ -71,45 +71,45 @@ class VolSeg2dTrainer:
         model_struc_dict["classes"] = self.label_no
         return model_struc_dict
 
-    def calculate_log_lr_ratio(self):
+    def _calculate_log_lr_ratio(self):
         return math.log(self.end_lr / self.starting_lr)
 
-    def create_model_and_optimiser(self, learning_rate, frozen=False):
+    def _create_model_and_optimiser(self, learning_rate, frozen=False):
         logging.info(f"Setting up the model on device {self.settings.cuda_device}.")
         self.model = create_model_on_device(
             self.model_device_num, self.model_struc_dict
         )
         if frozen:
-            self.freeze_model()
+            self._freeze_model()
         logging.info(
-            f"Model has {self.count_trainable_parameters()} trainable parameters, {self.count_parameters()} total parameters."
+            f"Model has {self._count_trainable_parameters()} trainable parameters, {self._count_parameters()} total parameters."
         )
-        self.optimizer = self.create_optimizer(learning_rate)
+        self.optimizer = self._create_optimizer(learning_rate)
         logging.info("Trainer created.")
 
-    def freeze_model(self):
+    def _freeze_model(self):
         logging.info(
-            f"Freezing model with {self.count_trainable_parameters()} trainable parameters, {self.count_parameters()} total parameters."
+            f"Freezing model with {self._count_trainable_parameters()} trainable parameters, {self._count_parameters()} total parameters."
         )
         for name, param in self.model.named_parameters():
             if all(["encoder" in name, "conv" in name]) and param.requires_grad:
                 param.requires_grad = False
 
-    def unfreeze_model(self):
+    def _unfreeze_model(self):
         logging.info(
-            f"Unfreezing model with {self.count_trainable_parameters()} trainable parameters, {self.count_parameters()} total parameters."
+            f"Unfreezing model with {self._count_trainable_parameters()} trainable parameters, {self._count_parameters()} total parameters."
         )
         for name, param in self.model.named_parameters():
             if all(["encoder" in name, "conv" in name]) and not param.requires_grad:
                 param.requires_grad = True
 
-    def count_trainable_parameters(self) -> int:
+    def _count_trainable_parameters(self) -> int:
         return sum(p.numel() for p in self.model.parameters() if p.requires_grad)
 
-    def count_parameters(self) -> int:
+    def _count_parameters(self) -> int:
         return sum(p.numel() for p in self.model.parameters())
 
-    def get_loss_criterion(self):
+    def _get_loss_criterion(self):
         if self.settings.loss_criterion == "BCEDiceLoss":
             alpha = self.settings.alpha
             beta = self.settings.beta
@@ -135,7 +135,7 @@ class VolSeg2dTrainer:
             sys.exit(1)
         return loss_criterion
 
-    def get_eval_metric(self):
+    def _get_eval_metric(self):
         # Get evaluation metric
         if self.settings.eval_metric == "MeanIoU":
             logging.info("Using MeanIoU")
@@ -157,29 +157,29 @@ class VolSeg2dTrainer:
         eval_scores = []
 
         if create:
-            self.create_model_and_optimiser(self.starting_lr, frozen=frozen)
-            lr_to_use = self.run_lr_finder()
+            self._create_model_and_optimiser(self.starting_lr, frozen=frozen)
+            lr_to_use = self._run_lr_finder()
             # Recreate model and start training
-            self.create_model_and_optimiser(lr_to_use, frozen=frozen)
-            early_stopping = self.create_early_stopping(output_path, patience)
+            self._create_model_and_optimiser(lr_to_use, frozen=frozen)
+            early_stopping = self._create_early_stopping(output_path, patience)
         else:
             # Reduce starting LR, since model alreadiy partiallly trained
             self.starting_lr /= self.lr_reduce_factor
             self.end_lr /= self.lr_reduce_factor
-            self.log_lr_ratio = self.calculate_log_lr_ratio()
-            self.load_in_model_and_optimizer(
+            self.log_lr_ratio = self._calculate_log_lr_ratio()
+            self._load_in_model_and_optimizer(
                 self.starting_lr, output_path, frozen=frozen, optimizer=False
             )
-            lr_to_use = self.run_lr_finder()
-            min_loss = self.load_in_model_and_optimizer(
+            lr_to_use = self._run_lr_finder()
+            min_loss = self._load_in_model_and_optimizer(
                 self.starting_lr, output_path, frozen=frozen, optimizer=False
             )
-            early_stopping = self.create_early_stopping(
+            early_stopping = self._create_early_stopping(
                 output_path, patience, best_score=-min_loss
             )
 
         # Initialise the One Cycle learning rate scheduler
-        lr_scheduler = self.create_oc_lr_scheduler(num_epochs, lr_to_use)
+        lr_scheduler = self._create_oc_lr_scheduler(num_epochs, lr_to_use)
 
         for epoch in range(1, num_epochs + 1):
             self.model.train()
@@ -190,7 +190,7 @@ class VolSeg2dTrainer:
                 desc="Training batch",
                 bar_format=cfg.TQDM_BAR_FORMAT,
             ):
-                loss = self.train_one_batch(lr_scheduler, batch)
+                loss = self._train_one_batch(lr_scheduler, batch)
                 train_losses.append(loss.item())  # record training loss
 
             self.model.eval()  # prep model for evaluation
@@ -243,17 +243,17 @@ class VolSeg2dTrainer:
                 break
 
         # load the last checkpoint with the best model
-        self.load_in_weights(output_path)
+        self._load_in_weights(output_path)
 
-    def load_in_model_and_optimizer(
+    def _load_in_model_and_optimizer(
         self, learning_rate, output_path, frozen=False, optimizer=False
     ):
-        self.create_model_and_optimiser(learning_rate, frozen=frozen)
+        self._create_model_and_optimiser(learning_rate, frozen=frozen)
         logging.info("Loading in weights from saved checkpoint.")
-        loss_val = self.load_in_weights(output_path, optimizer=optimizer)
+        loss_val = self._load_in_weights(output_path, optimizer=optimizer)
         return loss_val
 
-    def load_in_weights(self, output_path, optimizer=False, gpu=True):
+    def _load_in_weights(self, output_path, optimizer=False, gpu=True):
         # load the last checkpoint with the best model
         if gpu:
             map_location = f"cuda:{self.model_device_num}"
@@ -267,15 +267,15 @@ class VolSeg2dTrainer:
             self.optimizer.load_state_dict(model_dict["optimizer_state_dict"])
         return model_dict.get("loss_val", np.inf)
 
-    def run_lr_finder(self):
+    def _run_lr_finder(self):
         logging.info("Finding learning rate for model.")
-        lr_scheduler = self.create_exponential_lr_scheduler()
-        lr_find_loss, lr_find_lr = self.lr_finder(lr_scheduler)
-        lr_to_use = self.find_lr_from_graph(lr_find_loss, lr_find_lr)
+        lr_scheduler = self._create_exponential_lr_scheduler()
+        lr_find_loss, lr_find_lr = self._lr_finder(lr_scheduler)
+        lr_to_use = self._find_lr_from_graph(lr_find_loss, lr_find_lr)
         logging.info(f"LR to use {lr_to_use}")
         return lr_to_use
 
-    def lr_finder(self, lr_scheduler, smoothing=0.05):
+    def _lr_finder(self, lr_scheduler, smoothing=0.05):
         lr_find_loss = []
         lr_find_lr = []
         iters = 0
@@ -291,7 +291,7 @@ class VolSeg2dTrainer:
                 desc=f"Epoch {i + 1}, batch number",
                 bar_format=cfg.TQDM_BAR_FORMAT,
             ):
-                loss = self.train_one_batch(lr_scheduler, batch)
+                loss = self._train_one_batch(lr_scheduler, batch)
                 lr_step = self.optimizer.state_dict()["param_groups"][0]["lr"]
                 lr_find_lr.append(lr_step)
                 if iters == 0:
@@ -317,7 +317,7 @@ class VolSeg2dTrainer:
         return lr_find_loss, lr_find_lr
 
     @staticmethod
-    def find_lr_from_graph(
+    def _find_lr_from_graph(
         lr_find_loss: torch.Tensor, lr_find_lr: torch.Tensor
     ) -> float:
         """Calculates learning rate corresponsing to minimum gradient in graph
@@ -354,7 +354,7 @@ class VolSeg2dTrainer:
         min_lr = lr_find_lr[min_loss_grad_idx]
         return min_lr / cfg.LR_DIVISOR
 
-    def lr_exp_stepper(self, x):
+    def _lr_exp_stepper(self, x):
         """Exponentially increase learning rate as part of strategy to find the
         optimum.
         Taken from
@@ -364,13 +364,13 @@ class VolSeg2dTrainer:
             x * self.log_lr_ratio / (self.lr_find_epochs * len(self.training_loader))
         )
 
-    def create_optimizer(self, learning_rate):
+    def _create_optimizer(self, learning_rate):
         return torch.optim.AdamW(self.model.parameters(), lr=learning_rate)
 
-    def create_exponential_lr_scheduler(self):
-        return torch.optim.lr_scheduler.LambdaLR(self.optimizer, self.lr_exp_stepper)
+    def _create_exponential_lr_scheduler(self):
+        return torch.optim.lr_scheduler.LambdaLR(self.optimizer, self._lr_exp_stepper)
 
-    def create_oc_lr_scheduler(self, num_epochs, lr_to_use):
+    def _create_oc_lr_scheduler(self, num_epochs, lr_to_use):
         return torch.optim.lr_scheduler.OneCycleLR(
             self.optimizer,
             max_lr=lr_to_use,
@@ -379,7 +379,7 @@ class VolSeg2dTrainer:
             pct_start=self.settings.pct_lr_inc,
         )
 
-    def create_early_stopping(self, output_path, patience, best_score=None):
+    def _create_early_stopping(self, output_path, patience, best_score=None):
         return EarlyStopping(
             patience=patience,
             verbose=True,
@@ -388,7 +388,7 @@ class VolSeg2dTrainer:
             best_score=best_score,
         )
 
-    def train_one_batch(self, lr_scheduler, batch):
+    def _train_one_batch(self, lr_scheduler, batch):
         inputs, targets = utils.prepare_training_batch(
             batch, self.model_device_num, self.label_no
         )
