@@ -54,7 +54,7 @@ Buslaev, A., Iglovikov, V.I., Khvedchenya, E., Parinov, A., Druzhinin, M., and K
 
 **Segmentation Models PyTorch**
 
-Yakubovskiy, P. (2020). Segmentation Models Pytorch ([GitHub]((https://github.com/qubvel/segmentation_models.pytorch))).
+Yakubovskiy, P. (2020). Segmentation Models Pytorch. [GitHub](https://github.com/qubvel/segmentation_models.pytorch).
 
 **PyTorch-3dUnet**
 
