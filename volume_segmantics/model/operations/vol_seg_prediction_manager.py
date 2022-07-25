@@ -12,13 +12,22 @@ from volume_segmantics.model.operations.vol_seg_2d_predictor import VolSeg2dPred
 class VolSeg2DPredictionManager(BaseDataManager):
     def __init__(
         self,
-        predictor: VolSeg2dPredictor,
+        model_file_path: str,
         data_vol: Union[str, np.ndarray],
         settings: SimpleNamespace,
     ) -> None:
         super().__init__(data_vol, settings)
-        self.predictor = predictor
+        self.predictor = VolSeg2dPredictor(model_file_path, settings)
         self.settings = settings
+
+    def get_label_codes(self) -> dict:
+        """Returns a dictionary of label codes, retrieved from the saved model.
+
+        Returns:
+            dict: Label codes. These provide information on the labels that were used 
+            when training the model along with any associated metadata.
+        """
+        return self.predictor.label_codes
 
     def predict_volume_to_path(
         self, output_path: Union[Path, None], quality: Union[utils.Quality, None] = None
