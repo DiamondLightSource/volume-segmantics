@@ -72,7 +72,7 @@ to model architecture, encoder type, loss function or training epochs are requir
 these can be made by editing a YAML file.
 
 Even though these 2D models are quicker to train and require fewer computational 
-resources than their 3D counterparts [@alvarez-borges_u-net_2021], when 
+resources than their 3D counterparts [@alvarez-borges_u-net_2022], when 
 predicting a segmentation for a volume, the lack of 2D context available to these 
 models can lead to striping artifacts in the 3D output, especially when viewed 
 in planes other than the one used for prediction. To overcome this, a multi-axis 
@@ -90,7 +90,7 @@ $(2520 \times 2520 \times 2120 pixels)$. In a completely different context, SXCT
 datasets were collected on a soil system in which methane bubbles were forming in 
 brine amongst sand particles. The utility of a pre-trained 2D U-Net was investigated 
 to segment these variable-contrast image volumes in comparison with a 3D U-Net with 
-no prior training [@alvarez-borges_u-net_2021]. In this case, the training data 
+no prior training [@alvarez-borges_u-net_2022]. In this case, the training data 
 ranged in size from $384^3$ pixels to $572^3$. As well as requiring less time to 
 train than a 3D U-Net, the pre-trained 2D network provided more accurate segmentation 
 results. 
