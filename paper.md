@@ -37,7 +37,7 @@ Imaging (MRI), Electron Tomography (ET)). Although the idea of semantic
 segmentation is a relatively simple one, giving each pixel a label that defines 
 what it represents (e.g cranial bone versus brain tissue), due to the subjective 
 and laborious nature of the manual labelling task coupled with the huge size of the 
-data (multi-GB files containing billions of pixels) this process is a bottleneck 
+data (multi-GB files containing billions of pixels) this process is often a bottleneck 
 in imaging workflows. In recent years, deep learning has brought models capable of 
 fast and accurate interpretation of image data into the toolbox available to 
 scientists. These models are often trained on large image datasets that have been 
@@ -73,7 +73,7 @@ these can be made by editing a YAML file.
 
 Even though these 2D models are quicker to train and require fewer computational 
 resources than their 3D counterparts [@alvarez-borges_u-net_2022], when 
-predicting a segmentation for a volume, the lack of 2D context available to these 
+predicting a segmentation for a volume, the lack of 3D context available to these 
 models can lead to striping artifacts in the 3D output, especially when viewed 
 in planes other than the one used for prediction. To overcome this, a multi-axis 
 prediction method is used, and the multiple predictions are merged by using 
@@ -98,13 +98,15 @@ results.
 The API provided with the package allows segmentation models to be trained and 
 used in other contexts. For example, `Volume Segmantics` is currently being 
 integrated into `SuRVoS2` [@pennington_survos_2022], a client-server application with 
-a GUI for annotating volumetric data. In order to generate machine learning models 3D 
-'scribbles' are drawn on the data to provide training annotation. 
-It is hoped that scientists using our synchrotron facility will be able to train 
-and use their own deep learning models using this interface to the library. These 
-models can then be used to segment data during their time here and also when back at 
-their home institution. It is also hoped that the scientific community will use and 
-extend `Volume Segmantics` for their own purposes. 
+a GUI for annotating volumetric data. SuRVoS2 can be used to create the initial small 
+region of interest annotations needed by `Volume Segmantics` using its machine learning 
+models where 'scribbles' are initially drawn on the data, leading ultimatly to a complete 
+segmentation of the regions of interest. It is hoped that scientists using our 
+synchrotron facility and beyond will be able to train and use their own deep 
+learning models using this interface to the library. These models can then be 
+used to segment data during their time here and also when back at their home 
+institution. It is also hoped that the scientific community will use and extend 
+`Volume Segmantics` for their own purposes. 
 
 # Acknowledgements
 
