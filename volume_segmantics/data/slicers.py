@@ -1,6 +1,7 @@
 import logging
 import os
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import volume_segmantics.utilities.base_data_utils as utils
@@ -11,20 +12,25 @@ from typing import Union
 
 
 class TrainingDataSlicer(BaseDataManager):
-    """Class that converts 3d data volumes into 2d image slices on disk for
-    model training.
+    """
+    Class that performs image preprocessing and provides methods to 
+    convert 3d data volumes into 2d image slices on disk for model training.
     Slicing is carried in all of the xy (z), xz (y) and yz (x) planes.
-
-    Args:
-        settings (SimpleNamespace): An initialised object with settings data.
     """
 
     def __init__(
         self,
         data_vol: Union[str, np.ndarray],
         label_vol: Union[str, np.ndarray],
-        settings,
+        settings: SimpleNamespace,
     ):
+        """Inits TrainingDataSlicer.
+
+        Args:
+            data_vol(Union[str, np.ndarray]): Either a path to an image data volume or a numpy array of 3D image data
+            label_vol(Union[str, np.ndarray]): Either a path to a label data volume or a numpy array of 3D label data
+            settings(SimpleNamespace): An object containing the training settings
+        """
         super().__init__(data_vol, settings)
         self.data_im_out_dir = None
         self.seg_im_out_dir = None
@@ -63,22 +69,28 @@ class TrainingDataSlicer(BaseDataManager):
         for idx, current in enumerate(seg_classes):
             self.seg_vol[self.seg_vol == current] = idx
 
-    def output_data_slices(self, data_dir, prefix):
-        """Wrapper method to intitiate slicing data volume to disk.
+    def output_data_slices(self, data_dir: Path, prefix: str) -> None:
+        """
+        Method that triggers slicing image data volume to disk in the
+        xy (z), xz (y) and yz (x) planes.
 
         Args:
-            data_dir (pathlib.Path): The path to the directory where images will be saved.
+            data_dir (Path): Path to the directory for image output
+            prefix (str): String to prepend to image filename
         """
         self.data_im_out_dir = data_dir
         logging.info("Slicing data volume and saving slices to disk")
         os.makedirs(data_dir, exist_ok=True)
         self._output_slices_to_disk(self.data_vol, data_dir, prefix)
 
-    def output_label_slices(self, data_dir, prefix):
-        """Wrapper method to intitiate slicing label volume to disk.
+    def output_label_slices(self, data_dir: Path, prefix: str) -> None:
+        """
+        Method that triggers slicing label data volume to disk in the
+        xy (z), xz (y) and yz (x) planes.
 
         Args:
-            data_dir (pathlib.Path): The path to the directory where images will be saved.
+            data_dir (Path): Path to the directory for label image output
+            prefix (str): String to prepend to image filename
         """
         self.seg_im_out_dir = data_dir
         logging.info("Slicing label volume and saving slices to disk")
@@ -114,7 +126,7 @@ class TrainingDataSlicer(BaseDataManager):
         # TODO: Allow saving a higher bit depth
         if data.dtype != np.uint8:
             data = img_as_ubyte(data)
-        
+
         if label and not self.multilabel:
             data[data > 1] = 1
         io.imsave(f"{path}.png", data, check_contrast=False)
@@ -128,7 +140,9 @@ class TrainingDataSlicer(BaseDataManager):
             logging.info(f"Deleting the empty directory.")
             im_dir_path.rmdir()
 
-    def clean_up_slices(self):
-        """Wrapper function that cleans up data and label image slices."""
+    def clean_up_slices(self) -> None:
+        """
+        Deletes data and label image slices created by Slicer.
+        """
         self._delete_image_dir(self.data_im_out_dir)
         self._delete_image_dir(self.seg_im_out_dir)

@@ -1,8 +1,10 @@
 import csv
 import logging
 import math
+from pathlib import Path
 import sys
 import time
+from types import SimpleNamespace
 from typing import Union
 
 import matplotlib as mpl
@@ -31,16 +33,26 @@ from volume_segmantics.utilities.early_stopping import EarlyStopping
 
 
 class VolSeg2dTrainer:
-    """Class that utlises 2d dataloaders to train a 2d deep learning model.
-
-    Args:
-        sampler
-        settings
+    """Class that provides methods to train a 2d deep learning model
+    and to output figures showing training and validation loss and
+    example predictions on random validation images.
     """
 
     def __init__(
-        self, image_dir_path, label_dir_path, labels: Union[int, dict], settings
+        self,
+        image_dir_path: Path,
+        label_dir_path: Path,
+        labels: Union[int, dict],
+        settings: SimpleNamespace,
     ):
+        """Inits VolSeg2dTrainer.
+
+        Args:
+            image_dir_path (Path): Path to directory containing image data slices.
+            label_dir_path (Path): Path to directory containing label data slices.
+            labels (Union[int, dict]): Either number of labels or dictionary containing label names and associated metadata.
+            settings (SimpleNamespace): A training settings object.
+        """
         self.training_loader, self.validation_loader = get_2d_training_dataloaders(
             image_dir_path, label_dir_path, settings
         )
@@ -148,9 +160,23 @@ class VolSeg2dTrainer:
             sys.exit(1)
         return eval_metric
 
-    def train_model(self, output_path, num_epochs, patience, create=True, frozen=False):
-        """Performs training of model for a number of cycles
+    def train_model(
+        self,
+        output_path: Path,
+        num_epochs: int,
+        patience: int,
+        create: bool = True,
+        frozen: bool = False,
+    ) -> None:
+        """Performs training of model for a number of epochs
         with a learning rate that is determined automatically.
+
+        Args:
+            output_path (Path): Path to save model file to.
+            num_epochs (int): Number of epochs to train the model for.
+            patience (int): Number of epochs to wait for while validation loss is not improving before terminating.
+            create (bool, optional): Whether to create a new model and optimizer from scratch. Defaults to True.
+            frozen (bool, optional): Whether to freeze the weights for convolutional layers in the encoder. Defaults to False.
         """
         train_losses = []
         valid_losses = []
@@ -403,7 +429,13 @@ class VolSeg2dTrainer:
         lr_scheduler.step()  # update the learning rate
         return loss
 
-    def output_loss_fig(self, model_out_path):
+    def output_loss_fig(self, model_out_path: Path) -> None:
+        """Save out a figure showing training and validation loss versus
+        epoch number.
+
+        Args:
+            model_out_path (Path): Path to the model output by the trainer. 
+        """
 
         fig = plt.figure(figsize=(10, 8))
         plt.plot(
@@ -448,9 +480,9 @@ class VolSeg2dTrainer:
             for row in rows:
                 writer.writerow(row)
 
-    def output_prediction_figure(self, model_path):
-        """Saves a figure containing image slice data for three random images
-        fromthe validation dataset along with the corresponding ground truth
+    def output_prediction_figure(self, model_path: Path) -> None:
+        """Saves a figure containing image slice data for four random images
+        from the validation dataset along with the corresponding ground truth
         label image and corresponding prediction output from the model attached
         to this class instance. The image is saved to the same directory as the
         model weights.
