@@ -96,17 +96,17 @@ train than a 3D U-Net, the pre-trained 2D network provided more accurate segment
 results. 
 
 The API provided with the package allows segmentation models to be trained and 
-used in other contexts. For example, `Volume Segmantics` is currently being 
-integrated into `SuRVoS2` [@pennington_survos_2022], a client-server application with 
-a GUI for annotating volumetric data. SuRVoS2 can be used to create the initial small 
-region of interest annotations needed by `Volume Segmantics` using its machine learning 
-models where 'scribbles' are initially drawn on the data, leading ultimatly to a complete 
-segmentation of the regions of interest. It is hoped that scientists using our 
-synchrotron facility and beyond will be able to train and use their own deep 
+used in other contexts. For example, `Volume Segmantics` has recently been 
+integrated into `SuRVoS2` [@survos2:2018; @pennington_survos_2022], a client-server 
+application with a GUI for annotating volumetric data. SuRVoS2 can be used to create the 
+initial small region of interest (ROI) annotations needed by `Volume Segmantics`, making 
+use if its machine learning models trained through 'scribbles' drawn on the data, leading 
+ultimately to a complete segmentation of these ROIs. It is hoped that scientists using our 
+synchrotron facility, and beyond, will be able to train and use their own deep 
 learning models using this interface to the library. These models can then be 
 used to segment data during their time here and also when back at their home 
-institution. It is also hoped that the scientific community will use and extend 
-`Volume Segmantics` for their own purposes. 
+institution. In addition, it is hoped that the scientific community will use and 
+extend `Volume Segmantics` for their own purposes. 
 
 # Acknowledgements
 
