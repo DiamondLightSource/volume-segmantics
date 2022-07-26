@@ -8,8 +8,9 @@ import yaml
 
 
 def get_settings_data(data: Union[Path, dict, None]) -> SimpleNamespace:
-    """Creates an object holding settings data if a path to a YAML file or a
-    dictionary is given. If the data is None, an empty namespace is returned.
+    """Given a path to a YAML file or a dictionary object, returns a 
+    simple namespace object holding settings data. If the data is None, 
+    an empty namespace is returned.
     """
     if data is None:
         return SimpleNamespace()

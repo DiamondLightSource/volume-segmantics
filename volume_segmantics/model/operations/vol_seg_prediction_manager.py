@@ -10,12 +10,23 @@ from volume_segmantics.model.operations.vol_seg_2d_predictor import VolSeg2dPred
 
 
 class VolSeg2DPredictionManager(BaseDataManager):
+    """Class that manages prediction of data volumes to disk using a
+    2d deep learning network.
+    """
+
     def __init__(
         self,
         model_file_path: str,
         data_vol: Union[str, np.ndarray],
         settings: SimpleNamespace,
     ) -> None:
+        """Inits VolSeg2DPredictionManager.
+
+        Args:
+            model_file_path (str): String of filepath to trained model to use for prediction.
+            data_vol (Union[str, np.ndarray]): String of filepath to data volume or numpy array of data to predict segmentation of.
+            settings (SimpleNamespace): A prediction settings object.
+        """
         super().__init__(data_vol, settings)
         self.predictor = VolSeg2dPredictor(model_file_path, settings)
         self.settings = settings
@@ -24,7 +35,7 @@ class VolSeg2DPredictionManager(BaseDataManager):
         """Returns a dictionary of label codes, retrieved from the saved model.
 
         Returns:
-            dict: Label codes. These provide information on the labels that were used 
+            dict: Label codes. These provide information on the labels that were used
             when training the model along with any associated metadata.
         """
         return self.predictor.label_codes
@@ -32,6 +43,15 @@ class VolSeg2DPredictionManager(BaseDataManager):
     def predict_volume_to_path(
         self, output_path: Union[Path, None], quality: Union[utils.Quality, None] = None
     ) -> np.ndarray:
+        """Method which triggers prediction of a 3D segmentation to disk at a specified quality. 
+
+        Args:
+            output_path (Union[Path, None]): Path to predict volume to.
+            quality (Union[utils.Quality, None], optional): A quality to predict the segmentation to. Defaults to None.
+
+        Returns:
+            np.ndarray: _description_
+        """
         probs = None
         one_hot = self.settings.one_hot
         if quality is None:
