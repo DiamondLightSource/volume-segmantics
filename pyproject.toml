@@ -23,6 +23,7 @@ matplotlib = "^3.3.0"
 torch = ">=1.7.1"
 segmentation-models-pytorch = "^0.2.1"
 termplotlib = "^0.3.6"
+imagecodecs = "*"
 
 [tool.poetry.dev-dependencies]
 black = ">=22.1.0"
