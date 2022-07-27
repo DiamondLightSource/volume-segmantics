@@ -43,7 +43,12 @@ class VolSeg2DPredictionManager(BaseDataManager):
     def predict_volume_to_path(
         self, output_path: Union[Path, None], quality: Union[utils.Quality, None] = None
     ) -> np.ndarray:
-        """Method which triggers prediction of a 3D segmentation to disk at a specified quality. 
+        """Method which triggers prediction of a 3D segmentation to disk at a specified quality.
+
+        Here 'quality' refers to the number of axes/rotations that the segmentation is predicted 
+        in. e.g. Low quality, single axis (x, y) prediction; medium quality, three axis (x, y), 
+        (x, z), (y, z) prediction; high quality 12 way (3 axis and 4 rotations) prediction.
+        Multi-axis predictions are combined into a final output volume by using maximum probabilities. 
 
         Args:
             output_path (Union[Path, None]): Path to predict volume to.

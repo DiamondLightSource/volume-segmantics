@@ -19,6 +19,13 @@ from pathlib import Path
 
 
 class Quality(Enum):
+    """An Enum that holds values describing the quality of segmentation 
+    prediction required. 
+
+    Refers to the number of axes/rotations that the segmentation is predicted 
+    in. e.g. Low quality, single axis (x, y) prediction; medium quality, three axis (x, y), 
+    (x, z), (y, z) prediction; high quality 12 way (3 axis and 4 rotations) prediction.
+    """
     LOW = 1
     MEDIUM = 3
     HIGH = 12
