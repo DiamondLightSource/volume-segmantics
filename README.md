@@ -33,7 +33,7 @@ model-train-2d --data path/to/image/data.h5 --labels path/to/corresponding/segme
 
 Paths to multiple data and label volumes can be added after the `--data` and `--labels` flags respectively. A model will be trained according to the settings defined in `/volseg-settings/2d_model_train_settings.yaml` and saved to your working directory. In addition, a figure showing "ground truth" segmentation vs model segmentation for some images in the validation set will be saved. 
 
-##### For 3d volume segmentation prediction using a 2d model
+### For 3d volume segmentation prediction using a 2d model
 Run the following command. Input image files can be in HDF5 or multi-page TIFF format.
 
 ```shell
@@ -42,9 +42,18 @@ model-predict-2d path/to/model_file.pytorch path/to/data_for_prediction.h5
 
 The input data will be segmented using the input model following the settings specified in `volseg-settings/2d_model_predict_settings.yaml`. An HDF5 file containing the segmented volume will be saved to your working directory.
 
+### Currently supported model architectures and encoders
+
+The model architectures which are currently available and tested are: U-Net, U-Net++, FPN, DeepLabV3, DeepLabV3+, MA-Net and LinkNet.
+The pre-trained encoders that can be used with these architectures are: ResNet-34, ResNet50 and ResNeXt-50_32x4d.
+
 ## Using the API
 
 You can use the functionality of the package in your own program via the API, this is [documented here](https://diamondlightsource.github.io/volume-segmantics/). This interface is the one used by [SuRVoS2](https://github.com/DiamondLightSource/SuRVoS2), a client/server GUI application that allows fast annotation and segmentation of volumetric data. 
+
+## Contributing
+
+We welcome contributions from the community. Please take a look at out [contribution guidelines](https://github.com/DiamondLightSource/volume-segmantics/blob/main/CONTRIBUTING.md) for more information.
 
 ## References
 
@@ -54,8 +63,8 @@ Buslaev, A., Iglovikov, V.I., Khvedchenya, E., Parinov, A., Druzhinin, M., and K
 
 **Segmentation Models PyTorch**
 
-Yakubovskiy, P. (2020). Segmentation Models Pytorch. [GitHub](https://github.com/qubvel/segmentation_models.pytorch).
+Yakubovskiy, P. (2020). Segmentation Models Pytorch. [GitHub](https://github.com/qubvel/segmentation_models.pytorch)
 
 **PyTorch-3dUnet**
 
-Wolny, A., Cerrone, L., Vijayan, A., Tofanelli, R., Barro, A.V., Louveaux, M., Wenzl, C., Strauss, S., Wilson-Sánchez, D., Lymbouridou, R., et al. (2020). Accurate and versatile 3D segmentation of plant tissues at cellular resolution. ELife 9, e57613. [https://doi.org/10.7554/eLife.57613](https://doi.org/10.7554/eLife.57613).
+Wolny, A., Cerrone, L., Vijayan, A., Tofanelli, R., Barro, A.V., Louveaux, M., Wenzl, C., Strauss, S., Wilson-Sánchez, D., Lymbouridou, R., et al. (2020). Accurate and versatile 3D segmentation of plant tissues at cellular resolution. ELife 9, e57613. [https://doi.org/10.7554/eLife.57613](https://doi.org/10.7554/eLife.57613)
