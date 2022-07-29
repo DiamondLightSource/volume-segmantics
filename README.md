@@ -42,6 +42,10 @@ model-predict-2d path/to/model_file.pytorch path/to/data_for_prediction.h5
 
 The input data will be segmented using the input model following the settings specified in `volseg-settings/2d_model_predict_settings.yaml`. An HDF5 file containing the segmented volume will be saved to your working directory.
 
+### Tutorial using example data
+
+A tutorial is available [here](training_data/README.md) that provides a walk-through of how to segment blood vessels from synchrotron X-ray micro-CT data collected on a sample of human placental tissue.
+
 ### Currently supported model architectures and encoders
 
 The model architectures which are currently available and tested are: U-Net, U-Net++, FPN, DeepLabV3, DeepLabV3+, MA-Net and LinkNet.
