@@ -14,7 +14,7 @@ jobs:
           python_version: "3.9.13"
           pypi_token: ${{ secrets.PYPI_TOKEN }}
           ignore_dev_requirements: "yes"
-  zip-settings:
+  zip-files:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -22,12 +22,25 @@ jobs:
         with:
           files: volseg-settings
           dest: volseg-settings.zip
+      - uses: vimtor/action-zip@v1
+        with:
+          files: training_data
+          dest: training-data.zip
       - uses: actions/upload-artifact@v1
         with:
           name: volseg-settings
           path: ${{ github.workspace }}/volseg-settings.zip
+      - uses: actions/upload-artifact@v1
+        with:
+          name: training-data
+          path: ${{ github.workspace }}/training-data.zip
       - name: Add settings to release
         uses: djn24/add-asset-to-release@v1
         with:
           token: ${{secrets.GITHUB_TOKEN}}
           path: ${{ github.workspace }}/volseg-settings.zip
+      - name: Add training data to release
+        uses: djn24/add-asset-to-release@v1
+        with:
+          token: ${{secrets.GITHUB_TOKEN}}
+          path: ${{ github.workspace }}/training-data.zip
