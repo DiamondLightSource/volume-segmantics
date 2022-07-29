@@ -25,7 +25,7 @@ from volume_segmantics.data.pytorch3dunet_losses import (
     GeneralizedDiceLoss,
 )
 from volume_segmantics.data.pytorch3dunet_metrics import (
-    GenericAveragePrecision,
+    DiceCoefficient,
     MeanIoU,
 )
 from volume_segmantics.model.model_2d import create_model_on_device
@@ -152,9 +152,9 @@ class VolSeg2dTrainer:
         if self.settings.eval_metric == "MeanIoU":
             logging.info("Using MeanIoU")
             eval_metric = MeanIoU()
-        elif self.settings.eval_metric == "GenericAveragePrecision":
-            logging.info("Using GenericAveragePrecision")
-            eval_metric = GenericAveragePrecision()
+        elif self.settings.eval_metric == "DiceCoefficient":
+            logging.info("Using DiceCoefficient")
+            eval_metric = DiceCoefficient()
         else:
             logging.error("No evaluation metric specified, exiting")
             sys.exit(1)
@@ -241,6 +241,8 @@ class VolSeg2dTrainer:
                     probs = torch.unsqueeze(probs, 2)
                     targets = torch.unsqueeze(targets, 2)
                     eval_score = self.eval_metric(probs, targets)
+                    if eval_score.is_cuda:
+                        eval_score = eval_score.cpu().detach().numpy()
                     eval_scores.append(eval_score)  # record eval metric
 
             toc = time.perf_counter()

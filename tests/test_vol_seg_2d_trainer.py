@@ -74,7 +74,7 @@ class TestVolSeg2dTrainer:
         "eval_metric_name",
         [
             "MeanIoU",
-            "GenericAveragePrecision",
+            "DiceCoefficient",
         ],
     )
     def test_get_eval_metric(self, volseg_2d_trainer, eval_metric_name):

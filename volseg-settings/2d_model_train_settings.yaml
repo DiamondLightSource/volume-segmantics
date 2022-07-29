@@ -8,18 +8,18 @@ data_hdf5_path: /data # The internal HDF5 path to the image data
 seg_hdf5_path: /data # The internal HDF5 path to the label data
 
 # Settings for model training
-image_size: 256 # size of images in databunch used for training (must be multiple of 32)
+image_size: 256 # size of images used for training (must be multiple of 32)
 downsample: False # If True, data will be downsampled by 2
 training_set_proportion: 0.8 # Proportion of images to use the training, rest are used for validation
 cuda_device: 0 # The graphics card to use (between 0 and 3 for a machine with 4 GPUs)
-num_cyc_frozen: 8 # Number of times to run fit_one_cycle on frozen model
-num_cyc_unfrozen: 5 # Number of times to run fit_one_cycle on unfrozen model
-patience: 3 # Number of epoch to wait before early stopping if validation loss does not improve
+num_cyc_frozen: 8 # Number of training epochs on frozen model
+num_cyc_unfrozen: 5 # Number of training epochs on unfrozen model
+patience: 3 # Number of epochs to wait before early stopping if validation loss does not improve
 
 loss_criterion: "DiceLoss" # Choose from one of [BCEDiceLoss, BCELoss, DiceLoss, GeneralizedDiceLoss, CrossEntropyLoss]
 alpha: 0.75 # When BCEDiceLoss selected, weighting for BCELoss
 beta: 0.25 # When BCEDiceLoss selected, weighting for DiceLoss
-eval_metric: "MeanIoU" # Choose from one of [MeanIoU, GenericAveragePrecision]
+eval_metric: "MeanIoU" # Choose from one of [MeanIoU, DiceCoefficient]
 pct_lr_inc: 0.3 # the percentage of overall iterations where the LR is increasing
 # Parameters for finding learning rate
 starting_lr: 1e-6 # Lower bound of learning rate search
@@ -30,7 +30,7 @@ plot_lr_graph: False # Set to True if gnuplot is installed and a terminal plot o
 
 # Parameters to control model architecture
 model:
-  # Choose type of segmenation model from the list of those tested so far
+  # Choose type of segmentation model from the list of those tested so far
   # ["U_Net", "U_Net_Plus_plus", "FPN", "DeepLabV3", "DeepLabV3_Plus"]
   # "MA_Net", "Linknet"]
   type: "U_Net"
