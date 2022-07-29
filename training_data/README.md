@@ -18,9 +18,9 @@ Installation and configuration is also described in the [README](https://github.
 
 We will use our model trained in the step above to predict segmentation for a larger region of data. Since this $512^3$ region of data (159MB) is too large to store in the GitHub repository, we'll download it from Zenodo. 
 
-1. You can do so through your web browser by using [this link](https://zenodo.org/api/files/fc8e12d1-4256-4ed9-8a23-66c0d6c64379/specimen1_512cube_zyx_800-1312_1000-1512_700-1212_DATA.h5), alternatively you can use a command-line tool such as `curl` like so: `curl -o specimen1_512cube_zyx_800-1312_1000-1512_700-1212_DATA.h5 https://zenodo.org/api/files/fc8e12d1-4256-4ed9-8a23-66c0d6c64379/specimen1_512cube_zyx_800-1312_1000-1512_700-1212_DATA.h5`
+1. You can download using your web browser via [this link](https://zenodo.org/api/files/fc8e12d1-4256-4ed9-8a23-66c0d6c64379/specimen1_512cube_zyx_800-1312_1000-1512_700-1212_DATA.h5), alternatively you can use a command-line tool such as `curl` like so: `curl -o specimen1_512cube_zyx_800-1312_1000-1512_700-1212_DATA.h5 https://zenodo.org/api/files/fc8e12d1-4256-4ed9-8a23-66c0d6c64379/specimen1_512cube_zyx_800-1312_1000-1512_700-1212_DATA.h5`
 2. If required, edit settings in the file `volseg-settings/2d_model_predict_settings.yaml`. For example, you may wish to change the strategy used for prediction by changing the `quality` setting, the defaults should give a decent result.
-3. Predict the segmentation using the command `model-predict-2d \<name of model file>.pytorch specimen1_512cube_zyx_800-1312_1000-1512_700-1212_DATA.h5`. An HDF5 file containing a segmenation prediction will be saved in your working directory. 
+3. Predict the segmentation using the command `model-predict-2d <name of model file>.pytorch specimen1_512cube_zyx_800-1312_1000-1512_700-1212_DATA.h5`. An HDF5 file containing a segmentation prediction will be saved in your working directory. 
 4. To view the HDF5 output, you can use a program such as [DAWN](https://dawnsci.org/downloads/). 
 
 For example, here is an example of a volume representation of the output along with slices in the three orthogonal planes viewed with DAWN. This prediction was done using a U-Net with pre-trained ResNet-34 encoder using the "Medium" (3-axis) quality setting. 
