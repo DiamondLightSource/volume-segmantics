@@ -48,9 +48,19 @@ A tutorial is available [here](training_data/README.md) that provides a walk-thr
 
 ## Currently supported model architectures and encoders
 
-The model architectures which are currently available and tested are: U-Net, U-Net++, FPN, DeepLabV3, DeepLabV3+, MA-Net and LinkNet.
+The model architectures which are currently available and tested are: 
+- U-Net
+- U-Net++
+- FPN
+- DeepLabV3
+- DeepLabV3+
+- MA-Net
+- LinkNet.
 
-The pre-trained encoders that can be used with these architectures are: ResNet-34, ResNet50 and ResNeXt-50_32x4d.
+The pre-trained encoders that can be used with these architectures are: 
+- ResNet-34
+- ResNet50
+- ResNeXt-50_32x4d.
 
 ## Using the API
 
