@@ -319,7 +319,7 @@ def clip_to_uint16(data: np.array, data_mean: float, st_dev_factor: float) -> np
     """
     data = clip_data(data, data_mean, st_dev_factor)
     logging.info("Converting to uint8.")
-    data = np.multiply(data, 65,535, out=data)
+    data = np.multiply(data, 65535, out=data)
     return data.astype(np.uint16)
 
 
