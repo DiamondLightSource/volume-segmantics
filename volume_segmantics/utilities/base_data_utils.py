@@ -239,17 +239,21 @@ def sequential_labels(unique_labels: np.array) -> bool:
         return False
 
 
-def clip_to_uint8(data: np.array, data_mean: float, st_dev_factor: float) -> np.array:
-    """Clips data to a certain number of st_devs of the mean and reduces
-    bit depth to uint8.
+def clip_data(data: np.array, data_mean: float, st_dev_factor: float) -> np.ndarray:
+    """Clips data to a certain number of st_devs of the mean and returns an array
+    of floating point values.
+
 
     Args:
-        data(np.array): The data to be processed.
+        data (np.array): Input data array
+        data_mean (float): Mean of the input data array
+        st_dev_factor (float): Number of standard deviations above and below the mean
+         to clip data to
 
     Returns:
-        np.array: A unit8 data array.
+        np.ndarray: A clipped floating point array.
     """
-    logging.info("Clipping data and converting to uint8.")
+    logging.info("Clipping data.")
     logging.info(f"Calculating standard deviation.")
     data_st_dev = np.nanstd(data)
     logging.info(f"Std dev: {data_st_dev}. Calculating stats.")
@@ -278,12 +282,45 @@ def clip_to_uint8(data: np.array, data_mean: float, st_dev_factor: float) -> np.
     data = np.clip(data, lower_bound, upper_bound, out=data)
     data = np.subtract(data, lower_bound, out=data)
     data = np.divide(data, (upper_bound - lower_bound), out=data)
-    # data = (data - lower_bound) / (upper_bound - lower_bound)
     data = np.clip(data, 0.0, 1.0, out=data)
-    # data = exposure.rescale_intensity(data, in_range=(lower_bound, upper_bound))
+    return data
+
+
+def clip_to_uint8(data: np.array, data_mean: float, st_dev_factor: float) -> np.array:
+    """Clips data to a certain number of st_devs of the mean and reduces
+    bit depth to uint8.
+
+    Args:
+        data(np.array): The data to be processed.
+        data_mean (float): Mean of the input data array
+        st_dev_factor (float): Number of standard deviations above and below the mean
+         to clip data to
+
+    Returns:
+        np.array: A unit8 data array.
+    """
+    data = clip_data(data, data_mean, st_dev_factor)
     logging.info("Converting to uint8.")
     data = np.multiply(data, 255, out=data)
     return data.astype(np.uint8)
+
+def clip_to_uint16(data: np.array, data_mean: float, st_dev_factor: float) -> np.array:
+    """Clips data to a certain number of st_devs of the mean and reduces
+    bit depth to uint16.
+
+    Args:
+        data(np.array): The data to be processed.
+        data_mean (float): Mean of the input data array
+        st_dev_factor (float): Number of standard deviations above and below the mean
+         to clip data to
+
+    Returns:
+        np.array: A unit8 data array.
+    """
+    data = clip_data(data, data_mean, st_dev_factor)
+    logging.info("Converting to uint8.")
+    data = np.multiply(data, 65,535, out=data)
+    return data.astype(np.uint16)
 
 
 def get_num_of_ims(vol_shape: Tuple, axis_enum: Axis):
