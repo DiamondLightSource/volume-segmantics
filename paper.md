@@ -78,7 +78,9 @@ models can lead to striping artifacts in the 3D output, especially when viewed
 in planes other than the one used for prediction. To overcome this, a multi-axis 
 prediction method is used, and the multiple predictions are merged by using 
 maximum probability voting. It is hoped that in the future other merging techniques 
-will be included such as fusion models [@perslev_one_2019].
+will be included such as fusion models [@perslev_one_2019]. A schematic of the training and prediction processes performed by the `Volume Segmantics` package can be seen in Figure \autoref{fig:schematic}.
+
+![A schematic diagram showing the model training and segmentation prediction processes performed by the `Volume Segmantics` package.\label{fig:schematic}](schematic_hig_res_crop.png)
 
 During development of `Volume Segmantics` pre-trained U-Net models have been 
 given additional fine-tuning on small amounts of annotated data in order to 
@@ -102,7 +104,7 @@ application with a GUI for annotating volumetric data. SuRVoS2 can be used to cr
 initial small region of interest (ROI) annotations needed by `Volume Segmantics`, making 
 use if its machine learning models trained through 'scribbles' drawn on the data, leading 
 ultimately to a complete segmentation of these ROIs. It is hoped that scientists using our 
-synchrotron facility, and beyond, will be able to train and use their own deep 
+synchrotron facility and beyond will be able to train and use their own deep 
 learning models using this interface to the library. These models can then be 
 used to segment data during their time here and also when back at their home 
 institution. In addition, it is hoped that the scientific community will use and 
