@@ -28,7 +28,7 @@ class VolSeg2dPredictor:
     def _get_model_from_trainer(self, trainer):
         self.model = trainer.model
 
-    def _predict_single_axis(self, data_vol, output_probs=False, axis=Axis.Z):
+    def _predict_single_axis(self, data_vol, output_probs=True, axis=Axis.Z):
         output_vol_list = []
         output_prob_list = []
         data_vol = utils.rotate_array_to_axis(data_vol, axis)
