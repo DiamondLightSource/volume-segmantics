@@ -4,7 +4,6 @@
 """
 
 import importlib
-import logging
 
 import numpy as np
 import torch
@@ -12,7 +11,6 @@ import torch
 from skimage.metrics import peak_signal_noise_ratio, mean_squared_error
 
 from volume_segmantics.data.pytorch3dunet_losses import compute_per_channel_dice
-from volume_segmantics.data.pytorch3dunet_seg_metrics import AveragePrecision, Accuracy
 from volume_segmantics.utilities.pytorch3dunet_utils import expand_as_one_hot, convert_to_numpy
 
 
