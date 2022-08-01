@@ -78,7 +78,7 @@ models can lead to striping artifacts in the 3D output, especially when viewed
 in planes other than the one used for prediction. To overcome this, a multi-axis 
 prediction method is used, and the multiple predictions are merged by using 
 maximum probability voting. It is hoped that in the future other merging techniques 
-will be included such as fusion models [@perslev_one_2019]. A schematic of the training and prediction processes performed by the `Volume Segmantics` package can be seen in Figure \autoref{fig:schematic}.
+will be included such as fusion models [@perslev_one_2019]. A schematic of the training and prediction processes performed by the `Volume Segmantics` package can be seen in \autoref{fig:schematic}.
 
 ![A schematic diagram showing the model training and segmentation prediction processes performed by the `Volume Segmantics` package.\label{fig:schematic}](schematic_hig_res_crop.png)
 
