@@ -1,8 +1,7 @@
 import numpy as np
 import pytest
 import torch
-from volume_segmantics.model.operations.vol_seg_2d_predictor import \
-    VolSeg2dPredictor
+from volume_segmantics.model.operations.vol_seg_2d_predictor import VolSeg2dPredictor
 
 
 @pytest.fixture()
@@ -21,7 +20,9 @@ class TestVolseg2DPredictor:
     @pytest.mark.gpu
     @pytest.mark.slow
     def test_predict_single_axis(self, volseg_2d_predictor, rand_int_volume):
-        labels, probs = volseg_2d_predictor._predict_single_axis(rand_int_volume)
+        labels, probs = volseg_2d_predictor._predict_single_axis(
+            rand_int_volume, output_probs=False
+        )
         assert isinstance(labels, np.ndarray)
         assert labels.dtype == np.uint8
         assert probs is None
