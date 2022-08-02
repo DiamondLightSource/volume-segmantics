@@ -4,6 +4,7 @@ seg_im_out_dirname: seg # Name of folder that sliced segmentation 2D images with
 model_output_fn: trained_2d_model # Suffix for the saved model filename
 clip_data: False # Clip and rescale the image data intensities before saving to disk
 st_dev_factor: 2.575 # The number of standard deviations from the mean to clip data to
+use_higher_bit_depth: False # Use 16bit images as intermediate format, potentially slower and uses more disk space
 data_hdf5_path: /data # The internal HDF5 path to the image data
 seg_hdf5_path: /data # The internal HDF5 path to the label data
 
