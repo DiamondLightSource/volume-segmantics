@@ -49,7 +49,7 @@ class VolSeg2dDataset(BaseDataset):
     def __getitem__(self, i):
 
         # read data
-        image = cv2.imread(str(self.images_fps[i]), cv2.IMREAD_GRAYSCALE)
+        image = cv2.imread(str(self.images_fps[i]), cv2.IMREAD_ANYDEPTH)
         mask = cv2.imread(str(self.masks_fps[i]), 0)
 
         # apply pre-processing
@@ -129,8 +129,12 @@ class VolSeg2dPredictionDataset(BaseDataset):
         if self.imagenet_norm:
             if np.issubdtype(image.dtype, np.integer):
                 # Convert to float
+                if image.dtype == np.uint16:
+                    divisor = 65535
+                else:
+                    divisor = 255
                 image = image.astype(np.float32)
-                image = image / 255
+                image = image / divisor
             image = image - self.imagenet_mean
             image = image / self.imagenet_std
 
