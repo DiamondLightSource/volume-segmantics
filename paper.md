@@ -113,7 +113,7 @@ extend `Volume Segmantics` for their own purposes.
 # Acknowledgements
 
 We would like to acknowledge helpful discussions with Avery Pennington, Sharif Ahmed, 
-Fernando Alvarez-Borges, Luis Perdigao and Michele Darrow during the development of 
-this project.
+Fernando Alvarez-Borges and Michele Darrow during the development of 
+this project. Additional thanks to Luis Perdigao for inspiration and icons for the schematic figure. 
 
 # References
