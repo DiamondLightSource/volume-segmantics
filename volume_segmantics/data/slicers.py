@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import numpy as np
 import volume_segmantics.utilities.base_data_utils as utils
-from skimage import img_as_ubyte, io
+from skimage import img_as_ubyte, img_as_uint, io
 from tqdm import tqdm
 from volume_segmantics.data.base_data_manager import BaseDataManager
 from typing import Union
@@ -124,12 +124,16 @@ class TrainingDataSlicer(BaseDataManager):
             path (str): The path of the image file including the filename prefix.
             label (bool): Whether to convert values >1 to 1 for binary segmentation.
         """
-        # TODO: Allow saving a higher bit depth
-        if data.dtype != np.uint8:
+        data_dtype = data.dtype
+        if label:
+            data = img_as_ubyte(data)
+            if not self.multilabel:
+                data[data > 1] = 1
+        elif data_dtype.itemsize >= 2 and data_dtype != np.uint16:
+            data = img_as_uint(data)
+        elif data.dtype != np.uint8:
             data = img_as_ubyte(data)
 
-        if label and not self.multilabel:
-            data[data > 1] = 1
         io.imsave(f"{path}.png", data, check_contrast=False)
 
     def _delete_image_dir(self, im_dir_path):

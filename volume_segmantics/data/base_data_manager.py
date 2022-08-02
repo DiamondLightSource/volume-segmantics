@@ -34,7 +34,7 @@ class BaseDataManager:
         self.data_mean = np.nanmean(self.data_vol)
         logging.info(f"Mean value: {self.data_mean}")
         if self.settings.clip_data:
-            self.data_vol = utils.clip_to_uint8(
+            self.data_vol = utils.clip_data_according_to_type(
                 self.data_vol, self.data_mean, self.st_dev_factor
             )
         if np.isnan(self.data_vol).any():

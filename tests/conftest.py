@@ -71,7 +71,12 @@ def rand_size():
 
 @pytest.fixture()
 def rand_int_volume(rand_size):
-    return np.random.randint(256, size=rand_size)
+    return np.random.randint(65536, size=rand_size)
+
+
+@pytest.fixture()
+def rand_uint8_volume(rand_size):
+    return np.random.randint(256, size=rand_size).astype(np.uint8)
 
 
 @pytest.fixture()
@@ -182,10 +187,10 @@ def model_path(tmp_path, training_settings):
     model_struc_dict["classes"] = 4
     model = create_model_on_device(0, model_struc_dict)
     model_dict = {
-            "model_state_dict": model.state_dict(),
-            "model_struc_dict": model_struc_dict,
-            "label_codes": {},
-        }
+        "model_state_dict": model.state_dict(),
+        "model_struc_dict": model_struc_dict,
+        "label_codes": {},
+    }
     model_save_path = tmp_path / "test_model.pytorch"
     torch.save(model_dict, model_save_path)
     yield model_save_path

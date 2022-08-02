@@ -70,12 +70,17 @@ class TestBaseDataManagerPreprocessData:
     def test_preprocess_clip_int(self, training_settings, rand_int_volume):
         training_settings.clip_data = True
         base_dm = BaseDataManager(rand_int_volume, training_settings)
+        assert base_dm.data_vol.dtype == np.uint16
+
+    def test_preprocess_clip_uint8(self, training_settings, rand_uint8_volume):
+        training_settings.clip_data = True
+        base_dm = BaseDataManager(rand_uint8_volume, training_settings)
         assert base_dm.data_vol.dtype == np.uint8
 
     def test_preprocess_clip_float(self, rand_float_volume, training_settings):
         training_settings.clip_data = True
         base_dm = BaseDataManager(rand_float_volume, training_settings)
-        assert base_dm.data_vol.dtype == np.uint8
+        assert base_dm.data_vol.dtype == np.uint16
 
     def test_preprocess_replace_nan(
         self,

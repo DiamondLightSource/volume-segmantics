@@ -44,7 +44,7 @@ class TestTrainingDataSlicer:
         values = np.unique(slicer.seg_vol)
         assert np.where(np.diff(values) != 1)[0].size == 0
 
-    def test_training_data_slicer_output_data(
+    def test_training_data_slicer_output_uint16_data(
         self, rand_int_volume, rand_label_volume, training_settings, empty_dir
     ):
         im_dir_path = empty_dir / "im_out"
@@ -56,7 +56,36 @@ class TestTrainingDataSlicer:
         assert len(file_list) != 0
         img = io.imread(file_list[0])
         assert isinstance(img, np.ndarray)
-        assert np.issubdtype(img.dtype, np.integer)
+        assert img.dtype == np.uint16
+
+    @pytest.mark.slow
+    def test_training_data_slicer_output_uint16_data_from_float(
+        self, rand_float_volume, rand_label_volume, training_settings, empty_dir
+    ):
+        im_dir_path = empty_dir / "im_out"
+        slicer = TrainingDataSlicer(
+            rand_float_volume, rand_label_volume, training_settings
+        )
+        slicer.output_data_slices(im_dir_path, "data")
+        file_list = list(im_dir_path.glob("*.png"))
+        assert len(file_list) != 0
+        img = io.imread(file_list[0])
+        assert isinstance(img, np.ndarray)
+        assert img.dtype == np.uint16
+
+    def test_training_data_slicer_output_uint8_data(
+        self, rand_uint8_volume, rand_label_volume, training_settings, empty_dir
+    ):
+        im_dir_path = empty_dir / "im_out"
+        slicer = TrainingDataSlicer(
+            rand_uint8_volume, rand_label_volume, training_settings
+        )
+        slicer.output_data_slices(im_dir_path, "data")
+        file_list = list(im_dir_path.glob("*.png"))
+        assert len(file_list) != 0
+        img = io.imread(file_list[0])
+        assert isinstance(img, np.ndarray)
+        assert img.dtype == np.uint8
 
     def test_training_data_slicer_output_data_all_axes(
         self, rand_int_volume, rand_label_volume, training_settings, empty_dir

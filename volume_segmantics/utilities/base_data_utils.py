@@ -297,12 +297,13 @@ def clip_to_uint8(data: np.array, data_mean: float, st_dev_factor: float) -> np.
          to clip data to
 
     Returns:
-        np.array: A unit8 data array.
+        np.array: A uint8 data array.
     """
     data = clip_data(data, data_mean, st_dev_factor)
     logging.info("Converting to uint8.")
     data = np.multiply(data, 255, out=data)
     return data.astype(np.uint8)
+
 
 def clip_to_uint16(data: np.array, data_mean: float, st_dev_factor: float) -> np.array:
     """Clips data to a certain number of st_devs of the mean and reduces
@@ -315,17 +316,42 @@ def clip_to_uint16(data: np.array, data_mean: float, st_dev_factor: float) -> np
          to clip data to
 
     Returns:
-        np.array: A unit8 data array.
+        np.array: A uint16 data array.
     """
     data = clip_data(data, data_mean, st_dev_factor)
-    logging.info("Converting to uint8.")
+    logging.info("Converting to uint16.")
     data = np.multiply(data, 65535, out=data)
     return data.astype(np.uint16)
 
 
-def get_num_of_ims(vol_shape: Tuple, axis_enum: Axis):
+def clip_data_according_to_type(
+    data: np.array, data_mean: float, st_dev_factor: float
+) -> np.array:
+    """Clips data to a certain number of st_devs of the mean and reduces
+    bit depth to uint16 or uint8 according to input data bit depth.
+
+    Args:
+        data(np.array): The data to be processed.
+        data_mean (float): Mean of the input data array
+        st_dev_factor (float): Number of standard deviations above and below the mean
+         to clip data to
+
+    Returns:
+        np.array: A uint16 or uint8 data array.
+    """
+    data_dtype = data.dtype
+    num_bytes = data_dtype.itemsize
+    if num_bytes == 1:
+        data = clip_to_uint8(data, data_mean, st_dev_factor)
+    else:
+        data = clip_to_uint16(data, data_mean, st_dev_factor)
+    return data
+
+
+def get_num_of_ims(vol_shape):
     """Calculates the number of images that will be created when slicing
     an image volume in specified planes or combinations of planes.
+    """
 
     Args:
         vol_shape (tuple): 3d volume shape (z, y, x).
