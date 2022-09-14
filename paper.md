@@ -82,8 +82,15 @@ will be included such as fusion models [@perslev_one_2019]. A schematic of the t
 
 ![A schematic diagram showing the model training and segmentation prediction processes performed by the `Volume Segmantics` package.\label{fig:schematic}](schematic_hig_res_crop.png)
 
-During development of `Volume Segmantics`, pre-trained U-Net models have been 
-given additional fine-tuning on small amounts of annotated data in order to 
+## State of the field
+
+Currently there are a number of other software implementations available for segmentation of 3D data. Some of these also use 2d networks and combine prediction outputs to 3D, for example the `Multi-Planar U-Net` package [@perslev_github_2019] and the `CTSegNet` package [@tekawade_github_2020]. However, neither of these packages allows the use of pre-trained encoders or multiple model architectures. In addition, the general purpose `pytorch-3dunet` package [@wolny_github_2019] exists to allow training a 3D U-Net on image data, again without the time and resource advantages of pre-trained 2D networks. 
+
+In the field of connectomics, several packages enable the segmentation of structures within the brain, often from electron microscopy data, these could in principle be used in a subject and method-agnostic manner similarly to `volume-segmantics` [@lee_deepem_2018; @lin2021pytorch; @urakubo_uni-em_2019; @wu_neutorch_2021]. One member of this set, the package `pytorch-connectomics`, [@lin_pth_connec_github_2019] allows training of 2D and 3D networks for segmentation of 3D image data as well as customisable strategies for data augmentation and multi-task and semi-supervised learning. Despite the versatility of this software, there is only one pre-trained 2D model architecture available. The wide variety of configuration and command-line options as well as the focus on connectomics mean that this package is likely to be complex to use for a generalist novice. 
+
+## Real-world usage
+
+During development of `Volume Segmantics`, the software was used to fine-tune pre-trained U-Net models on small amounts of annotated data in order to 
 investigate the structures that interface maternal and fetal blood volumes in 
 human placental tissue [@tun_massively_2021]. In this study, expert annotation of 
 volumes of size $256^3$ and $384^3$ were sufficient to create two models that gave 
@@ -96,6 +103,8 @@ no prior training [@alvarez-borges_u-net_2022]. In this case, the training data
 ranged in size from $384^3$ pixels to $572^3$. As well as requiring less time to 
 train than a 3D U-Net, the pre-trained 2D network provided more accurate segmentation 
 results. 
+
+## The API
 
 The API provided with the package allows segmentation models to be trained and 
 used in other contexts. For example, `Volume Segmantics` has recently been 
