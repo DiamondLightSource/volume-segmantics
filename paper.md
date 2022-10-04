@@ -113,7 +113,7 @@ application with a GUI for annotating volumetric data. SuRVoS2 can be used to cr
 initial small region of interest (ROI) labels needed by `Volume Segmantics`, this is achieved by using machine learning models (e.g. random forests) which are trained through 'scribbles' drawn on the data. It is hoped that scientists using our 
 synchrotron facility and beyond will be able to train and use their own deep 
 learning models using this interface to the library. These models can then be 
-used to segment data during their time here and also when back at their home 
+used to segment data during their time using the synchrotron and also when back at their home 
 institution. In addition, it is hoped that the scientific community will use and 
 extend `Volume Segmantics` for their own purposes. 
 
