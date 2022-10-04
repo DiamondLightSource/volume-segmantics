@@ -48,7 +48,7 @@ allow the scientific community to create segmentation models using relatively
 small amounts of training data are required. `Volume Segmantics` is a Python 
 package that provides a command line interface (CLI) as well as an Application 
 Programming Interface (API) for training 2-dimensional (2D)
-PyTorch deep learning models on small amounts of annotated 3D image 
+PyTorch [@NEURIPS2019_9015] deep learning models on small amounts of annotated 3D image 
 data.  The package also enables applying these models to new (often much larger) 
 3D datasets to speed up the process of semantic segmentation.
 
