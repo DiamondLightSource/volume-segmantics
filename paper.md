@@ -95,7 +95,7 @@ investigate the structures that interface maternal and fetal blood volumes in
 human placental tissue [@tun_massively_2021]. In this study, expert annotation of 
 volumes of size $256^3$ and $384^3$ were sufficient to create two models that gave 
 accurate segmentation of two much larger synchrotron X-ray CT (SXCT) datasets 
-$(2520 \times 2520 \times 2120 pixels)$. In a completely different context, SXCT 
+($2520 \times 2520 \times 2120$ pixels). In a completely different context, SXCT 
 datasets were collected on a soil system in which methane bubbles were forming in 
 brine amongst sand particles. The utility of a pre-trained 2D U-Net was investigated 
 to segment these variable-contrast image volumes in comparison to a 3D U-Net with 
