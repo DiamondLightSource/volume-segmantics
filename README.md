@@ -75,10 +75,21 @@ We welcome contributions from the community. Please take a look at out [contribu
 ## Citation
 
 If you use this package for you research, please cite:
-King O.N.F, Bellos, D. and Basham, M. (2022). Volume Segmantics: A Python Package for Semantic Segmentation of Volumetric Data Using Pre-trained PyTorch Deep Learning Models. Journal of Open Source Software, 7(78), 4691, https://doi.org/10.21105/joss.04691
+
+[King O.N.F, Bellos, D. and Basham, M. (2022). Volume Segmantics: A Python Package for Semantic Segmentation of Volumetric Data Using Pre-trained PyTorch Deep Learning Models. Journal of Open Source Software, 7(78), 4691. doi: 10.21105/joss.04691](https://doi.org/10.21105/joss.04691)
 
 ```bibtex
-@article{King2022, doi = {10.21105/joss.04691}, url = {https://doi.org/10.21105/joss.04691}, year = {2022}, publisher = {The Open Journal}, volume = {7}, number = {78}, pages = {4691}, author = {Oliver N. F. King and Dimitrios Bellos and Mark Basham}, title = {Volume Segmantics: A Python Package for Semantic Segmentation of Volumetric Data Using Pre-trained PyTorch Deep Learning Models}, journal = {Journal of Open Source Software} }
+@article{King2022,
+    doi = {10.21105/joss.04691},
+    url = {https://doi.org/10.21105/joss.04691},
+    year = {2022},
+    publisher = {The Open Journal},
+    volume = {7},
+    number = {78},
+    pages = {4691},
+    author = {Oliver N. F. King and Dimitrios Bellos and Mark Basham},
+    title = {Volume Segmantics: A Python Package for Semantic Segmentation of Volumetric Data Using Pre-trained PyTorch Deep Learning Models},
+    journal = {Journal of Open Source Software} }
 ```
 
 ## References
