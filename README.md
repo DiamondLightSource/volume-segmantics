@@ -2,7 +2,7 @@
 
 A toolkit for semantic segmentation of volumetric data using PyTorch deep learning models.
 
-![example workflow](https://github.com/DiamondLightSource/volume-segmantics/actions/workflows/tests.yml/badge.svg) ![example workflow](https://github.com/DiamondLightSource/volume-segmantics/actions/workflows/release.yml/badge.svg)
+[![DOI](https://joss.theoj.org/papers/10.21105/joss.04691/status.svg)](https://doi.org/10.21105/joss.04691) ![example workflow](https://github.com/DiamondLightSource/volume-segmantics/actions/workflows/tests.yml/badge.svg) ![example workflow](https://github.com/DiamondLightSource/volume-segmantics/actions/workflows/release.yml/badge.svg)
 
 Volume Segmantics provides a simple command-line interface and API that allows researchers to quickly train a variety of 2D PyTorch segmentation models (e.g.  U-Net, U-Net++, FPN, DeepLabV3+) on their 3D datasets. These models use pre-trained encoders, enabling fast training on small datasets. Subsequently, the library enables using these trained models to segment larger 3D datasets, automatically merging predictions made in orthogonal planes and rotations to reduce artifacts that may result from predicting 3D segmentation using a 2D network.  
 
@@ -71,6 +71,15 @@ You can use the functionality of the package in your own program via the API, th
 ## Contributing
 
 We welcome contributions from the community. Please take a look at out [contribution guidelines](https://github.com/DiamondLightSource/volume-segmantics/blob/main/CONTRIBUTING.md) for more information.
+
+## Citation
+
+If you use this package for you research, please cite:
+King O.N.F, Bellos, D. and Basham, M. (2022). Volume Segmantics: A Python Package for Semantic Segmentation of Volumetric Data Using Pre-trained PyTorch Deep Learning Models. Journal of Open Source Software, 7(78), 4691, https://doi.org/10.21105/joss.04691
+
+```bibtex
+@article{King2022, doi = {10.21105/joss.04691}, url = {https://doi.org/10.21105/joss.04691}, year = {2022}, publisher = {The Open Journal}, volume = {7}, number = {78}, pages = {4691}, author = {Oliver N. F. King and Dimitrios Bellos and Mark Basham}, title = {Volume Segmantics: A Python Package for Semantic Segmentation of Volumetric Data Using Pre-trained PyTorch Deep Learning Models}, journal = {Journal of Open Source Software} }
+```
 
 ## References
 
