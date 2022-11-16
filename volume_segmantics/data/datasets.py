@@ -83,7 +83,7 @@ class VolSeg2dDataset(BaseDataset):
     @staticmethod
     def natsort(item):
         return [
-            int(t) if t.isdigit() else t.lower() for t in re.split("(\d+)", str(item))
+            int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", str(item))
         ]
 
 
