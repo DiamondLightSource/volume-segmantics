@@ -35,6 +35,7 @@ class Axis(Enum):
     Z = 0
     Y = 1
     X = 2
+    ALL = 4
 
 
 class ModelType(Enum):
@@ -69,6 +70,15 @@ def get_prediction_quality(settings: SimpleNamespace) -> Enum:
 def get_model_type(settings: SimpleNamespace) -> Enum:
     model_type = create_enum_from_setting(settings.model["type"], ModelType)
     return model_type
+
+
+def get_training_axis(settings: SimpleNamespace) -> Enum:
+    try:
+        axis_setting = settings.training_axes
+    except AttributeError:
+        axis_setting = "All"
+    axis_enum = create_enum_from_setting(axis_setting, Axis)
+    return axis_enum
 
 
 def setup_path_if_exists(input_param):
@@ -266,36 +276,45 @@ def clip_to_uint8(data: np.array, data_mean: float, st_dev_factor: float) -> np.
     return data.astype(np.uint8)
 
 
-def get_num_of_ims(vol_shape):
-    """Calculates the total number of images that will be created when slicing
-    an image volume in the z, y and x planes.
+def get_num_of_ims(vol_shape: Tuple, axis_enum: Axis):
+    """Calculates the number of images that will be created when slicing
+    an image volume in specified planes or combinations of planes.
 
     Args:
         vol_shape (tuple): 3d volume shape (z, y, x).
+        axis_enum (Enum): Defines specific axis or all axes
 
     Returns:
         int: Total number of images that will be created when the volume is
         sliced.
     """
-    return sum(vol_shape)
+    if axis_enum == Axis.ALL:
+        return sum(vol_shape)
+    else:
+       return vol_shape[axis_enum.value]
+    
 
-
-def get_axis_index_pairs(vol_shape):
-    """Gets all combinations of axis and image slice index that are found
+def get_axis_index_pairs(vol_shape: Tuple, axis_enum: Axis):
+    """Gets all combinations of axis and image slice indices that are found
     in a 3d volume.
 
     Args:
         vol_shape (tuple): 3d volume shape (z, y, x)
+        axis_enum (Enum): Defines specific axis or all axes
 
     Returns:
         itertools.chain: An iterable containing all combinations of axis
         and image index that are found in the volume.
     """
-    return chain(
-        product("z", range(vol_shape[0])),
-        product("y", range(vol_shape[1])),
-        product("x", range(vol_shape[2])),
-    )
+
+    if axis_enum == Axis.ALL:
+        return chain(
+            product("z", range(vol_shape[0])),
+            product("y", range(vol_shape[1])),
+            product("x", range(vol_shape[2])),
+        )
+    else:
+        return product(axis_enum.name.lower(), range(vol_shape[axis_enum.value]))
 
 
 def axis_index_to_slice(vol, axis, index):

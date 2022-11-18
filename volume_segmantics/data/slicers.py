@@ -107,8 +107,9 @@ class TrainingDataSlicer(BaseDataManager):
             label (bool): Whether this is a label volume.
         """
         shape_tup = data_arr.shape
-        ax_idx_pairs = utils.get_axis_index_pairs(shape_tup)
-        num_ims = utils.get_num_of_ims(shape_tup)
+        axis_enum = utils.get_training_axis(self.settings)
+        ax_idx_pairs = utils.get_axis_index_pairs(shape_tup, axis_enum)
+        num_ims = utils.get_num_of_ims(shape_tup, axis_enum)
         for axis, index in tqdm(ax_idx_pairs, total=num_ims):
             out_path = output_path / f"{name_prefix}_{axis}_stack_{index}"
             self._output_im(

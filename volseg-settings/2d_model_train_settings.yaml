@@ -8,6 +8,7 @@ data_hdf5_path: /data # The internal HDF5 path to the image data
 seg_hdf5_path: /data # The internal HDF5 path to the label data
 
 # Settings for model training
+training_axes: All # Specify axes/single axis to train on. Choose from [All, Z, X, Y]. 
 image_size: 256 # size of images used for training (must be multiple of 32)
 downsample: False # If True, data will be downsampled by 2
 training_set_proportion: 0.8 # Proportion of images to use the training, rest are used for validation
