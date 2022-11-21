@@ -1,5 +1,6 @@
 import numpy as np
 from volume_segmantics.data import TrainingDataSlicer
+import volume_segmantics.utilities.base_data_utils as utils
 import pytest
 from skimage import io
 
@@ -57,6 +58,33 @@ class TestTrainingDataSlicer:
         assert isinstance(img, np.ndarray)
         assert np.issubdtype(img.dtype, np.integer)
 
+    def test_training_data_slicer_output_data_all_axes(
+        self, rand_int_volume, rand_label_volume, training_settings, empty_dir
+    ):
+        im_dir_path = empty_dir / "im_out"
+        if hasattr(training_settings, "training_axis"):
+            delattr(training_settings, "training_axis")
+        slicer = TrainingDataSlicer(
+            rand_int_volume, rand_label_volume, training_settings
+        )
+        slicer.output_data_slices(im_dir_path, "data")
+        file_list = list(im_dir_path.glob("*.png"))
+        assert len(file_list) != 0
+        assert len(file_list) == sum(rand_int_volume.shape)
+
+    def test_training_data_slicer_output_data_single_axis(
+        self, rand_int_volume, rand_label_volume, training_settings, empty_dir
+    ):
+        im_dir_path = empty_dir / "im_out"
+        training_settings.training_axes = "y"
+        slicer = TrainingDataSlicer(
+            rand_int_volume, rand_label_volume, training_settings
+        )
+        slicer.output_data_slices(im_dir_path, "data")
+        file_list = list(im_dir_path.glob("*.png"))
+        assert len(file_list) != 0
+        assert len(file_list) == rand_int_volume.shape[1]
+
     def test_training_data_slicer_output_labels(
         self, rand_int_volume, rand_label_volume, training_settings, empty_dir
     ):
@@ -70,6 +98,33 @@ class TestTrainingDataSlicer:
         img = io.imread(file_list[0])
         assert isinstance(img, np.ndarray)
         assert np.issubdtype(img.dtype, np.integer)
+
+    def test_training_data_slicer_output_labels_all_axes(
+        self, rand_int_volume, rand_label_volume, training_settings, empty_dir
+    ):
+        label_dir_path = empty_dir / "label_out"
+        if hasattr(training_settings, "training_axis"):
+            delattr(training_settings, "training_axis")
+        slicer = TrainingDataSlicer(
+            rand_int_volume, rand_label_volume, training_settings
+        )
+        slicer.output_label_slices(label_dir_path, "seg")
+        file_list = list(label_dir_path.glob("*.png"))
+        assert len(file_list) != 0
+        assert len(file_list) == sum(rand_int_volume.shape)
+
+    def test_training_data_slicer_output_labels_single_axis(
+        self, rand_int_volume, rand_label_volume, training_settings, empty_dir
+    ):
+        label_dir_path = empty_dir / "label_out"
+        training_settings.training_axes = "x"
+        slicer = TrainingDataSlicer(
+            rand_int_volume, rand_label_volume, training_settings
+        )
+        slicer.output_label_slices(label_dir_path, "seg")
+        file_list = list(label_dir_path.glob("*.png"))
+        assert len(file_list) != 0
+        assert len(file_list) == rand_int_volume.shape[2]
 
     def test_training_data_slicer_output_binary_labels(
         self, rand_int_volume, rand_binary_label_volume, training_settings, empty_dir
