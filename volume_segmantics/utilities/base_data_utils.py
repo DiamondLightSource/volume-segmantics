@@ -19,13 +19,14 @@ from pathlib import Path
 
 
 class Quality(Enum):
-    """An Enum that holds values describing the quality of segmentation 
-    prediction required. 
+    """An Enum that holds values describing the quality of segmentation
+    prediction required.
 
-    Refers to the number of axes/rotations that the segmentation is predicted 
-    in. e.g. Low quality, single axis (x, y) prediction; medium quality, three axis (x, y), 
+    Refers to the number of axes/rotations that the segmentation is predicted
+    in. e.g. Low quality, single axis (x, y) prediction; medium quality, three axis (x, y),
     (x, z), (y, z) prediction; high quality 12 way (3 axis and 4 rotations) prediction.
     """
+
     LOW = 1
     MEDIUM = 3
     HIGH = 12
@@ -77,6 +78,15 @@ def get_training_axis(settings: SimpleNamespace) -> Enum:
         axis_setting = settings.training_axes
     except AttributeError:
         axis_setting = "All"
+    axis_enum = create_enum_from_setting(axis_setting, Axis)
+    return axis_enum
+
+
+def get_prediction_axis(settings: SimpleNamespace) -> Enum:
+    try:
+        axis_setting = settings.prediction_axis
+    except AttributeError:
+        axis_setting = "Z"
     axis_enum = create_enum_from_setting(axis_setting, Axis)
     return axis_enum
 
@@ -291,8 +301,8 @@ def get_num_of_ims(vol_shape: Tuple, axis_enum: Axis):
     if axis_enum == Axis.ALL:
         return sum(vol_shape)
     else:
-       return vol_shape[axis_enum.value]
-    
+        return vol_shape[axis_enum.value]
+
 
 def get_axis_index_pairs(vol_shape: Tuple, axis_enum: Axis):
     """Gets all combinations of axis and image slice indices that are found
