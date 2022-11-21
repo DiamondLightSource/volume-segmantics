@@ -7,3 +7,4 @@ data_hdf5_path: /data # Internal path in the HDF5 file where the image data for 
 cuda_device: 0 # Change this if you would like to run the prediction on a different GPU
 downsample: False # If True, data will be downsampled by 2 and segmentation will be upsampled by 2
 one_hot: False # Output one-hot encoded data
+prediction_axis: Z # One of [Z, Y, X]. Specify axis along which to predict if doing single-axis prediction.
