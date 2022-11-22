@@ -348,10 +348,9 @@ def clip_data_according_to_type(
     return data
 
 
-def get_num_of_ims(vol_shape):
+def get_num_of_ims(vol_shape, axis_enum: Axis):
     """Calculates the number of images that will be created when slicing
     an image volume in specified planes or combinations of planes.
-    """
 
     Args:
         vol_shape (tuple): 3d volume shape (z, y, x).
