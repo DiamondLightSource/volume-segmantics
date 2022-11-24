@@ -47,6 +47,7 @@ class ModelType(Enum):
     DEEPLABV3_PLUS = 5
     MA_NET = 6
     LINKNET = 7
+    PAN = 8
 
 
 def create_enum_from_setting(setting_str, enum):
