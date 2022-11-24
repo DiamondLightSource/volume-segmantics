@@ -18,10 +18,33 @@ import torch
         utils.ModelType.DEEPLABV3_PLUS,
         utils.ModelType.MA_NET,
         utils.ModelType.LINKNET,
+        utils.ModelType.PAN,
     ],
 )
 def test_create_model_on_device(binary_model_struc_dict, model_type):
     binary_model_struc_dict["type"] = model_type
+    model = create_model_on_device(0, binary_model_struc_dict)
+    assert isinstance(model, torch.nn.Module)
+    device = next(model.parameters()).device
+    assert device.type == "cuda"
+    assert device.index == 0
+
+
+@pytest.mark.gpu
+@pytest.mark.parametrize(
+    "encoder_type",
+    [
+        "resnet34",
+        "resnet50",
+        "resnext50_32x4d",
+        "efficientnet-b3",
+        "efficientnet-b4",
+        "timm-resnest50d",
+        "timm-resnest101e",
+    ],
+)
+def test_create_model_on_device_encoders(binary_model_struc_dict, encoder_type):
+    binary_model_struc_dict["encoder_name"] = encoder_type
     model = create_model_on_device(0, binary_model_struc_dict)
     assert isinstance(model, torch.nn.Module)
     device = next(model.parameters()).device

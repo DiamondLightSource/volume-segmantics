@@ -33,11 +33,12 @@ plot_lr_graph: False # Set to True if gnuplot is installed and a terminal plot o
 model:
   # Choose type of segmentation model from the list of those tested so far
   # ["U_Net", "U_Net_Plus_plus", "FPN", "DeepLabV3", "DeepLabV3_Plus"]
-  # "MA_Net", "Linknet"]
+  # "MA_Net", "Linknet", "PAN"]
   type: "U_Net"
   # For more details on encoder types please see smp.readthedocs.io
   # choose encoder, those tested so far include the following:
-  # ["resnet34", "resnet50", "resnext50_32x4d"]
+  # ["resnet34", "resnet50", "resnext50_32x4d", "efficientnet-b3","efficientnet-b4",
+  # "timm-resnest50d"*, "timm-resnest101e"*,] *Encoders with asterisk not compatible with PAN.
   encoder_name: "resnet34"
    # use `imagenet` pre-trained weights for encoder initialization
   encoder_weights: "imagenet"
