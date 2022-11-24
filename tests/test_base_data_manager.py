@@ -78,12 +78,31 @@ class TestBaseDataManagerPreprocessData:
         base_dm = BaseDataManager(rand_int_volume, training_settings)
         assert base_dm.data_vol.dtype == np.uint16
 
+    def test_preprocess_clip_int_16bit_clip_false(
+        self, training_settings, rand_int_volume
+    ):
+        training_settings.clip_data = False
+        training_settings.use_higher_bit_depth = True
+        base_dm = BaseDataManager(rand_int_volume, training_settings)
+        assert base_dm.data_vol.dtype == rand_int_volume.dtype
+
     def test_preprocess_clip_uint8(self, training_settings, rand_uint8_volume):
         training_settings.clip_data = True
+        training_settings.use_higher_bit_depth = False
         base_dm = BaseDataManager(rand_uint8_volume, training_settings)
         assert base_dm.data_vol.dtype == np.uint8
 
-    def test_preprocess_clip_uint8_higher_depth(self, training_settings, rand_uint8_volume):
+    def test_preprocess_clip_uint8_clip_false(
+        self, training_settings, rand_uint8_volume
+    ):
+        training_settings.clip_data = False
+        training_settings.use_higher_bit_depth = False
+        base_dm = BaseDataManager(rand_uint8_volume, training_settings)
+        assert base_dm.data_vol.dtype == np.uint8
+
+    def test_preprocess_clip_uint8_higher_depth(
+        self, training_settings, rand_uint8_volume
+    ):
         training_settings.clip_data = True
         training_settings.use_higher_bit_depth = True
         base_dm = BaseDataManager(rand_uint8_volume, training_settings)
@@ -91,6 +110,7 @@ class TestBaseDataManagerPreprocessData:
 
     def test_preprocess_clip_float(self, rand_float_volume, training_settings):
         training_settings.clip_data = True
+        training_settings.use_higher_bit_depth = False
         base_dm = BaseDataManager(rand_float_volume, training_settings)
         assert base_dm.data_vol.dtype == np.uint8
 

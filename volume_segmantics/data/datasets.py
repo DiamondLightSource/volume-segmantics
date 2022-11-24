@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import cv2
 import numpy as np
+import torch
 import volume_segmantics.data.augmentations as augs
 import volume_segmantics.utilities.config as cfg
 from torch.utils.data import Dataset as BaseDataset
@@ -63,10 +64,15 @@ class VolSeg2dDataset(BaseDataset):
             image, mask = sample["image"], sample["mask"]
 
         if self.imagenet_norm:
-            if np.issubdtype(image.dtype, np.integer):
+            im_dtype = image.dtype
+            if np.issubdtype(im_dtype, np.integer):
                 # Convert to float
+                if image.dtype == np.uint16:
+                    divisor = 65535
+                else:
+                    divisor = 255
                 image = image.astype(np.float32)
-                image = image / 255
+                image = image / divisor
             image = image - self.imagenet_mean
             image = image / self.imagenet_std
 
@@ -75,7 +81,7 @@ class VolSeg2dDataset(BaseDataset):
             sample = self.postprocessing(image=image, mask=mask)
             image, mask = sample["image"], sample["mask"]
 
-        return image, mask
+        return image.to(torch.float32), mask
 
     def __len__(self):
         return len(self.images_fps)
@@ -143,7 +149,7 @@ class VolSeg2dPredictionDataset(BaseDataset):
             sample = self.postprocessing(image=image)
             image = sample["image"]
 
-        return image
+        return image.to(torch.float32)
 
     def __len__(self):
         return self.data_vol.shape[0]

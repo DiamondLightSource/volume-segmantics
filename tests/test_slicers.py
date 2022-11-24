@@ -48,6 +48,8 @@ class TestTrainingDataSlicer:
         self, rand_int_volume, rand_label_volume, training_settings, empty_dir
     ):
         im_dir_path = empty_dir / "im_out"
+        training_settings.clip_data = True
+        training_settings.use_higher_bit_depth = True
         slicer = TrainingDataSlicer(
             rand_int_volume, rand_label_volume, training_settings
         )
@@ -63,6 +65,8 @@ class TestTrainingDataSlicer:
         self, rand_float_volume, rand_label_volume, training_settings, empty_dir
     ):
         im_dir_path = empty_dir / "im_out"
+        training_settings.clip_data = True
+        training_settings.use_higher_bit_depth = True
         slicer = TrainingDataSlicer(
             rand_float_volume, rand_label_volume, training_settings
         )
@@ -77,6 +81,8 @@ class TestTrainingDataSlicer:
         self, rand_uint8_volume, rand_label_volume, training_settings, empty_dir
     ):
         im_dir_path = empty_dir / "im_out"
+        training_settings.clip_data = True
+        training_settings.use_higher_bit_depth = True
         slicer = TrainingDataSlicer(
             rand_uint8_volume, rand_label_volume, training_settings
         )

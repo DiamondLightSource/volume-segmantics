@@ -129,7 +129,7 @@ class TrainingDataSlicer(BaseDataManager):
             data = img_as_ubyte(data)
             if not self.multilabel:
                 data[data > 1] = 1
-        elif data_dtype.itemsize >= 2 and data_dtype != np.uint16:
+        elif data_dtype.itemsize >= 2:
             data = img_as_uint(data)
         elif data.dtype != np.uint8:
             data = img_as_ubyte(data)

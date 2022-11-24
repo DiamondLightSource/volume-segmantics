@@ -34,7 +34,8 @@ class BaseDataManager:
         self.data_mean = np.nanmean(self.data_vol)
         logging.info(f"Mean value: {self.data_mean}")
         if self.settings.clip_data:
-            if self.settings.use_higher_bit_depth:
+            use_high_bit_depth = getattr(self.settings, "use_higher_bit_depth", False)
+            if use_high_bit_depth:
                 self.data_vol = utils.clip_data_according_to_type(
                     self.data_vol, self.data_mean, self.st_dev_factor
                 )

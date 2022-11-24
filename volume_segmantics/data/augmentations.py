@@ -95,7 +95,6 @@ def get_train_augs(img_size: int) -> A.core.composition.Compose:
                 ],
                 p=0.5,
             ),
-            A.CLAHE(p=0.5),
             A.OneOf([A.RandomBrightnessContrast(p=0.5), A.RandomGamma(p=0.5)], p=0.5),
         ]
     )
