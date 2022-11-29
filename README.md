@@ -68,6 +68,7 @@ The pre-trained encoders that can be used with these architectures are:
 - Efficientnet-b4
 - Resnest50d\*
 - Resnest101e\*
+
 \* Encoders with asterisk not compatible with PAN.
 
 ## Using the API
