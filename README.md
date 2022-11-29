@@ -57,12 +57,18 @@ The model architectures which are currently available and tested are:
 - DeepLabV3
 - DeepLabV3+
 - MA-Net
-- LinkNet.
+- LinkNet
+- PAN
 
 The pre-trained encoders that can be used with these architectures are: 
 - ResNet-34
 - ResNet50
-- ResNeXt-50_32x4d.
+- ResNeXt-50_32x4d
+- Efficientnet-b3
+- Efficientnet-b4
+- Resnest50d\*
+- Resnest101e\*
+\* Encoders with asterisk not compatible with PAN.
 
 ## Using the API
 
