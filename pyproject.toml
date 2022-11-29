@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "volume-segmantics"
-version = "0.2.8"
+version = "0.3.0"
 description = "A toolkit for semantic segmentation of volumetric data using pyTorch deep learning models"
 authors = ["Oliver King <olly.king@diamond.ac.uk>"]
 license = "Apache-2.0"
