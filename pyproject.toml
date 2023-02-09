@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "volume-segmantics"
-version = "0.3.0"
+version = "0.3.1"
 description = "A toolkit for semantic segmentation of volumetric data using pyTorch deep learning models"
 authors = ["Oliver King <olly.king@diamond.ac.uk>"]
 license = "Apache-2.0"
@@ -8,7 +8,7 @@ readme = "README.md"
 repository = "https://github.com/DiamondLightSource/volume-segmantics"
 keywords = ["segmentation", "deep-learning", "volumetric", "3d"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Operating System :: OS Independent",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Image Processing",
