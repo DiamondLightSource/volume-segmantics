@@ -32,9 +32,10 @@ def create_model_on_device(device_num: int, model_struc_dict: dict) -> torch.nn.
         logging.info(f"Sending the MA-Net model to device {device_num}")
     elif model_type == utils.ModelType.LINKNET:
         model = smp.Linknet(**struct_dict_copy)
+        logging.info(f"Sending the Linknet model to device {device_num}")
     elif model_type == utils.ModelType.PAN:
         model = smp.PAN(**struct_dict_copy)
-        logging.info(f"Sending the Linknet model to device {device_num}")
+        logging.info(f"Sending the PAN model to device {device_num}")
     return model.to(device_num)
 
 
