@@ -15,7 +15,7 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = ">=3.8"
 albumentations = "^1.1.0"
 h5py = "^3.0.0"
 numpy = "^1.18.0"
@@ -23,9 +23,10 @@ matplotlib = "^3.3.0"
 torch = ">=1.7.1"
 segmentation-models-pytorch = "^0.2.1"
 termplotlib = "^0.3.6"
-imagecodecs = "*"
+imagecodecs = "> 2022.2.22"
 
 [tool.poetry.dev-dependencies]
+opencv-python-headless = "4.8.0.74"
 black = ">=22.1.0"
 pdoc = ">=10"
 pylint = ">=2.4.0"
